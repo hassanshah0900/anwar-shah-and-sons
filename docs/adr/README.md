@@ -10,5 +10,6 @@ ADRs are immutable once accepted. To change a decision, add a new ADR that super
 | [0003](0003-prisma-orm.md)                      | Prisma as the ORM                          | Accepted |
 | [0004](0004-monochrome-design-system.md)        | Monochrome design system on shadcn/ui      | Accepted |
 | [0005](0005-authentication-with-better-auth.md) | Authentication with Better Auth            | Accepted |
+| [0006](0006-configurable-catalog.md)            | A configurable catalog                     | Accepted |
 
 New ADRs copy [template.md](template.md) and take the next number.
