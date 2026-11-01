@@ -11,6 +11,7 @@ import { ApiError, apiRequest } from '@/lib/api/server';
 import { getStoreConfig } from '@/lib/api/store';
 import { deleteProduct, updateProduct } from '../actions';
 import { ProductForm } from '../product-form';
+import { ProductImages } from '../product-images';
 import { VariantsEditor } from '../variants-editor';
 
 export const metadata: Metadata = { title: 'Edit product' };
@@ -65,6 +66,7 @@ async function EditProduct({ params }: { params: Params }) {
         store={store}
         product={product}
       />
+      <ProductImages product={product} optionTypes={optionTypes} />
       <VariantsEditor product={product} optionTypes={optionTypes} store={store} />
     </>
   );
