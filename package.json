@@ -22,5 +22,9 @@
   "devDependencies": {
     "prettier": "^3.4.2",
     "turbo": "^2.11.10"
+  },
+  "allowScripts": {
+    "@prisma/engines@7.10.1": true,
+    "prisma@7.10.1": true
   }
 }
