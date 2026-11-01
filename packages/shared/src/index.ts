@@ -5,4 +5,5 @@ export * from './money.js';
 export * from './products.js';
 export * from './slug.js';
 export * from './store.js';
+export * from './storefront.js';
 export * from './users.js';
