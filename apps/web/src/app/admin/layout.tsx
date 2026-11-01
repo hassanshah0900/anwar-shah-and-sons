@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
+import { AdminNav } from '@/components/admin/admin-nav';
 import { siteConfig } from '@/config/site';
 import { requireAdmin } from '@/lib/auth/session';
 
@@ -40,6 +41,7 @@ async function AdminShell({ children }: { children: React.ReactNode }) {
           </Link>
         </div>
       </header>
+      <AdminNav />
       <div className="flex flex-1 flex-col">{children}</div>
     </>
   );
