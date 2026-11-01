@@ -4,6 +4,7 @@ import request from 'supertest';
 import { App } from 'supertest/types.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 import { createTestApp, WEB_ORIGIN } from './support/app.js';
+import { resetCatalog } from './support/database.js';
 import { signUpAs } from './support/users.js';
 
 describe('Admin categories (e2e)', () => {
@@ -21,8 +22,7 @@ describe('Admin categories (e2e)', () => {
   beforeAll(async () => {
     app = await createTestApp();
     const prisma = app.get(PrismaService);
-    await prisma.category.deleteMany({ where: { parentId: { not: null } } });
-    await prisma.category.deleteMany();
+    await resetCatalog(prisma);
     await prisma.user.deleteMany();
     admin = await signUpAs(app, 'catalog-admin@example.com', 'admin');
   });
