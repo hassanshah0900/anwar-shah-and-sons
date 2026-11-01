@@ -23,7 +23,7 @@
     },
     "test": {
       "dependsOn": ["^build", "db:generate"],
-      "outputs": ["coverage/**"]
+      "outputs": []
     }
   }
 }
