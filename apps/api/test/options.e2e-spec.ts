@@ -65,6 +65,24 @@ describe('Admin product options (e2e)', () => {
     expect(list.optionTypes[0]?.values.map((value) => value.label)).toEqual(['S', 'M']);
   });
 
+  it('keeps values in the order they were added', async () => {
+    const shoe = (await send('post', '', { name: 'Shoe size', kind: 'text' }).expect(201)).body;
+    for (const label of ['40', '38', '42', '39']) {
+      await send('post', `/${shoe.id}/values`, { label }).expect(201);
+    }
+
+    const list = optionTypeListSchema.parse(
+      (
+        await request(app.getHttpServer())
+          .get('/api/v1/admin/option-types')
+          .set('Cookie', admin)
+          .expect(200)
+      ).body,
+    );
+    const values = list.optionTypes.find((type) => type.id === shoe.id)?.values;
+    expect(values?.map((value) => value.label)).toEqual(['40', '38', '42', '39']);
+  });
+
   it('requires a swatch for colour values', async () => {
     const colour = (await send('post', '', { name: 'Colour', kind: 'color' }).expect(201)).body;
 

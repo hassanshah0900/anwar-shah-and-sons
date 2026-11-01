@@ -24,6 +24,10 @@ export class CategoriesService {
 
   async create(input: CategoryInput): Promise<Category> {
     if (input.parentId) await this.assertExists(input.parentId);
+    const last = await this.prisma.category.aggregate({
+      where: { parentId: input.parentId ?? null },
+      _max: { position: true },
+    });
 
     return this.prisma.category.create({
       select: categorySelect,
@@ -32,7 +36,8 @@ export class CategoriesService {
         slug: input.slug ?? slugify(input.name),
         description: input.description ?? null,
         parentId: input.parentId ?? null,
-        position: input.position ?? 0,
+        // Without an explicit position, new categories go after their siblings.
+        position: input.position ?? (last._max.position ?? -1) + 1,
       },
     });
   }

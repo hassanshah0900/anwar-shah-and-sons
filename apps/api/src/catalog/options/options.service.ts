@@ -39,14 +39,17 @@ export class OptionsService {
     });
   }
 
-  createType(input: OptionTypeInput): Promise<OptionType> {
+  async createType(input: OptionTypeInput): Promise<OptionType> {
+    const last = await this.prisma.optionType.aggregate({ _max: { position: true } });
+
     return this.prisma.optionType.create({
       select: typeSelect,
       data: {
         name: input.name,
         slug: input.slug ?? slugify(input.name),
         kind: input.kind,
-        position: input.position ?? 0,
+        // Without an explicit position, new types go last.
+        position: input.position ?? (last._max.position ?? -1) + 1,
       },
     });
   }
@@ -66,6 +69,10 @@ export class OptionsService {
 
   async createValue(typeId: string, input: OptionValueInput): Promise<OptionValue> {
     const kind = await this.kindOf(typeId);
+    const last = await this.prisma.optionValue.aggregate({
+      where: { optionTypeId: typeId },
+      _max: { position: true },
+    });
 
     return this.prisma.optionValue.create({
       select: valueSelect,
@@ -74,7 +81,8 @@ export class OptionsService {
         label: input.label,
         slug: input.slug ?? slugify(input.label),
         colorHex: this.colorFor(kind, input.colorHex, true),
-        position: input.position ?? 0,
+        // Without an explicit position, values keep the order they were added in (XS, S, M…).
+        position: input.position ?? (last._max.position ?? -1) + 1,
       },
     });
   }
