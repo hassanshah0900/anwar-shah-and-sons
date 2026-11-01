@@ -154,6 +154,11 @@
   --sidebar-ring: oklch(0.965 0 0);
 }
 
+/* Horizontal page frame shared by the header, footer and page content. */
+@utility page-container {
+  @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

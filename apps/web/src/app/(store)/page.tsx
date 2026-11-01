@@ -3,7 +3,7 @@ import { ApiStatus, ApiStatusSkeleton } from '@/components/api-status';
 
 export default function HomePage() {
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center gap-6 px-6 py-24">
+    <main className="page-container flex flex-1 flex-col justify-center gap-6 py-24">
       <h1 className="text-5xl text-foreground sm:text-6xl">Anwar Shah &amp; Sons</h1>
       <p className="max-w-xl text-lg leading-8 text-muted-foreground">
         Our online store is under construction. Check back soon.
