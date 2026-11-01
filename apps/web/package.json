@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start --port 3000",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@repo/shared": "*",
@@ -26,7 +28,9 @@
     "eslint": "^10.14.0",
     "eslint-config-next": "16.4.3",
     "tailwindcss": "^4",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^4.1.12"
   },
   "description": "Next.js storefront for Anwar Shah & Sons"
 }

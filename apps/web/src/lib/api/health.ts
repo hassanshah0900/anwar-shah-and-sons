@@ -3,8 +3,7 @@ import { healthResponseSchema, type HealthResponse } from '@repo/shared';
 import { getServerEnv } from '../env';
 
 export type ApiHealth =
-  | { reachable: true; health: HealthResponse }
-  | { reachable: false; reason: string };
+  { reachable: true; health: HealthResponse } | { reachable: false; reason: string };
 
 /**
  * Fetches the API health check. The API answers 503 with the same body when a
