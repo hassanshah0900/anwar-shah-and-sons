@@ -10,6 +10,7 @@ import { MediaModule } from './media/media.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { StorageModule } from './storage/storage.module.js';
 import { StoreModule } from './store/store.module.js';
+import { StorefrontModule } from './storefront/storefront.module.js';
 import { UsersModule } from './users/users.module.js';
 
 @Module({
@@ -22,6 +23,7 @@ import { UsersModule } from './users/users.module.js';
     HealthModule,
     MediaModule,
     StoreModule,
+    StorefrontModule,
     UsersModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: OriginGuard }],
