@@ -31,6 +31,7 @@ flowchart LR
 | Backend   | NestJS 12                                |
 | Database  | PostgreSQL, Prisma 7 (pg driver adapter) |
 | Contracts | Zod 4                                    |
+| Auth      | Better Auth (sessions, roles)            |
 | Testing   | Vitest, Supertest                        |
 | Linting   | ESLint (web), oxlint (api), Prettier     |
 | Monorepo  | npm workspaces, Turborepo                |
@@ -65,8 +66,13 @@ cp apps/api/.env.example apps/api/.env        # use the same password in DATABAS
 cp apps/web/.env.example apps/web/.env.local
 
 docker compose up -d                          # PostgreSQL on localhost:5432
+npm run db:deploy -w api                      # apply database migrations
+npm run db:seed -w api                        # create the admin from ADMIN_* in apps/api/.env
 npm run dev
 ```
+
+Sign in at http://localhost:3000/sign-in with the admin account to reach `/admin`, or
+create a customer account at `/sign-up`.
 
 The local database is PostgreSQL 17 in Docker. The password is passed to the container as
 a Compose secret, not an environment variable. Stop it with `docker compose down`; add `-v`

@@ -1,5 +1,7 @@
 import Link from 'next/link';
-import { ShoppingBagIcon, UserIcon } from 'lucide-react';
+import { Suspense } from 'react';
+import { ShoppingBagIcon } from 'lucide-react';
+import { AccountMenu, SignInLink } from '@/components/account/account-menu';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { siteConfig } from '@/config/site';
@@ -32,11 +34,10 @@ export function SiteHeader() {
 
         <div className="ml-auto flex items-center gap-1">
           <ThemeToggle />
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/account" aria-label="Account">
-              <UserIcon />
-            </Link>
-          </Button>
+          {/* The header is static; only the account control waits for the session. */}
+          <Suspense fallback={<SignInLink />}>
+            <AccountMenu />
+          </Suspense>
           <Button variant="ghost" size="icon" asChild>
             <Link href="/cart" aria-label="Shopping bag">
               <ShoppingBagIcon />

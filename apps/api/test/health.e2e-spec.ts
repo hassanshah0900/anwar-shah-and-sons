@@ -4,7 +4,7 @@ import { healthResponseSchema } from '@repo/shared';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
 import { AppModule } from '../src/app.module.js';
-import { configureApp } from '../src/app.setup.js';
+import { appOptions, configureApp } from '../src/app.setup.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 
 describe('GET /api/health (e2e)', () => {
@@ -17,7 +17,7 @@ describe('GET /api/health (e2e)', () => {
       .useValue(prisma)
       .compile();
 
-    app = moduleRef.createNestApplication({ logger: false });
+    app = moduleRef.createNestApplication({ ...appOptions, logger: false });
     configureApp(app);
     await app.init();
   });
