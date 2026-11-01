@@ -7,32 +7,42 @@ NestJS REST API for Anwar Shah & Sons. See the [root README](../../README.md) fo
 Copy `.env.example` to `.env`. Every variable is validated at startup by
 [`src/config/env.ts`](src/config/env.ts). The app refuses to start if one is missing or malformed.
 
-| Variable             | Description                                          | Default       |
-| -------------------- | ---------------------------------------------------- | ------------- |
-| `NODE_ENV`           | `development`, `test` or `production`                | `development` |
-| `PORT`               | HTTP port                                            | `4000`        |
-| `CORS_ORIGIN`        | Origin allowed to call the API (the web app)         | (required)    |
-| `DATABASE_URL`       | PostgreSQL connection string                         | (required)    |
-| `BETTER_AUTH_SECRET` | Signs auth cookies; at least 32 characters           | (required)    |
-| `BETTER_AUTH_URL`    | Public URL of the web app (it proxies `/api/auth/*`) | (required)    |
-| `STORE_CURRENCY`     | ISO 4217 currency for all prices                     | `PKR`         |
-| `STORE_LOCALE`       | Locale for formatting prices and dates               | `en-PK`       |
+| Variable                 | Description                                          | Default       |
+| ------------------------ | ---------------------------------------------------- | ------------- |
+| `NODE_ENV`               | `development`, `test` or `production`                | `development` |
+| `PORT`                   | HTTP port                                            | `4000`        |
+| `CORS_ORIGIN`            | Origin allowed to call the API (the web app)         | (required)    |
+| `DATABASE_URL`           | PostgreSQL connection string                         | (required)    |
+| `BETTER_AUTH_SECRET`     | Signs auth cookies; at least 32 characters           | (required)    |
+| `BETTER_AUTH_URL`        | Public URL of the web app (it proxies `/api/auth/*`) | (required)    |
+| `STORE_CURRENCY`         | ISO 4217 currency for all prices                     | `PKR`         |
+| `STORE_LOCALE`           | Locale for formatting prices and dates               | `en-PK`       |
+| `STORAGE_DRIVER`         | `local` (a directory) or `s3`                        | `local`       |
+| `STORAGE_LOCAL_DIR`      | Directory for the local driver                       | `uploads`     |
+| `S3_BUCKET`, `S3_REGION` | Bucket for the S3 driver (required with `s3`)        |               |
+| `S3_ENDPOINT`            | S3-compatible endpoint such as MinIO; omit for AWS   |               |
 
 `ADMIN_NAME`, `ADMIN_EMAIL` and `ADMIN_PASSWORD` are read only by `npm run db:seed`.
 
+With `STORAGE_DRIVER=s3` the API needs `s3:PutObject`, `s3:GetObject` and `s3:DeleteObject` on
+`products/*` in the bucket. Credentials come from the AWS default chain (e.g. the ECS task
+role). See [ADR 0007](../../docs/adr/0007-media-storage.md).
+
 ## Routes
 
-| Route                                 | Description                                                               |
-| ------------------------------------- | ------------------------------------------------------------------------- |
-| `GET /api/health`                     | Health check: `200` when all dependencies are up, else `503` (public)     |
-| `/api/auth/*`                         | Better Auth: sign-up, sign-in, sign-out, session (public)                 |
-| `GET /api/v1/users/me`                | The signed-in user                                                        |
-| `GET /api/v1/users`                   | All users (admin only)                                                    |
-| `GET /api/v1/store`                   | Store currency and locale (public)                                        |
-| `/api/v1/admin/categories`            | Category tree: list, create, update, delete (admin)                       |
-| `/api/v1/admin/option-types`          | Product options and their values (admin)                                  |
-| `/api/v1/admin/products`              | Products: list (filter, search, paginate), create, update, delete (admin) |
-| `/api/v1/admin/products/:id/variants` | Variants: add, update, delete, `POST /generate` all combinations (admin)  |
+| Route                                         | Description                                                                       |
+| --------------------------------------------- | --------------------------------------------------------------------------------- |
+| `GET /api/health`                             | Health check: `200` when all dependencies are up, else `503` (public)             |
+| `/api/auth/*`                                 | Better Auth: sign-up, sign-in, sign-out, session (public)                         |
+| `GET /api/v1/users/me`                        | The signed-in user                                                                |
+| `GET /api/v1/users`                           | All users (admin only)                                                            |
+| `GET /api/v1/store`                           | Store currency and locale (public)                                                |
+| `/api/v1/admin/categories`                    | Category tree: list, create, update, delete (admin)                               |
+| `/api/v1/admin/option-types`                  | Product options and their values (admin)                                          |
+| `/api/v1/admin/products`                      | Products: list (filter, search, paginate), create, update, delete (admin)         |
+| `/api/v1/admin/products/:id/variants`         | Variants: add, update, delete, `POST /generate` all combinations (admin)          |
+| `/api/v1/admin/products/:id/images`           | Images: multipart upload (`file`, `alt`, `optionValueId`), update, delete (admin) |
+| `GET /api/v1/media/products/:productId/:file` | Uploaded images, cached forever (public)                                          |
 
 Every route requires a session unless it is marked `@AllowAnonymous()`, and every write
 must come from the web app's origin (CSRF). Request bodies are validated with the shared
@@ -66,6 +76,8 @@ src/
   prisma/       PrismaService (single client / connection pool)
   health/       health check module
   store/        store settings endpoint
+  storage/      media storage drivers (local, S3) and image type detection
+  media/        serves uploaded media
   users/        current user and admin user list
   generated/    Prisma client (generated, git-ignored)
   app.setup.ts  HTTP setup shared by main.ts and e2e tests
