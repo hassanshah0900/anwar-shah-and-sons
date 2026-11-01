@@ -4,6 +4,7 @@ import request from 'supertest';
 import { App } from 'supertest/types.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 import { createTestApp, WEB_ORIGIN } from './support/app.js';
+import { resetCatalog } from './support/database.js';
 import { signUpAs } from './support/users.js';
 
 describe('Admin product options (e2e)', () => {
@@ -20,7 +21,7 @@ describe('Admin product options (e2e)', () => {
   beforeAll(async () => {
     app = await createTestApp();
     const prisma = app.get(PrismaService);
-    await prisma.optionType.deleteMany();
+    await resetCatalog(prisma);
     await prisma.user.deleteMany();
     admin = await signUpAs(app, 'options-admin@example.com', 'admin');
   });

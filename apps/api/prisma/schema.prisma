@@ -102,6 +102,7 @@ model Category {
 
   parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
   children Category[] @relation("CategoryTree")
+  products Product[]
 
   @@index([parentId, position])
   @@map("categories")
@@ -124,7 +125,8 @@ model OptionType {
   createdAt DateTime   @default(now()) @map("created_at")
   updatedAt DateTime   @updatedAt @map("updated_at")
 
-  values OptionValue[]
+  values   OptionValue[]
+  products ProductOption[]
 
   @@map("option_types")
 }
@@ -140,9 +142,88 @@ model OptionValue {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  optionType OptionType @relation(fields: [optionTypeId], references: [id], onDelete: Cascade)
+  optionType OptionType           @relation(fields: [optionTypeId], references: [id], onDelete: Cascade)
+  variants   VariantOptionValue[]
 
   @@unique([optionTypeId, slug], map: "option_values_slug_key")
   @@index([optionTypeId, position])
   @@map("option_values")
+}
+
+enum ProductStatus {
+  draft
+  active
+  archived
+
+  @@map("product_status")
+}
+
+/// Prices are integers in the store currency's minor unit (see @repo/shared money).
+/// CHECK constraints in the migration keep prices and stock non-negative.
+model Product {
+  id             String        @id @default(cuid(2))
+  name           String
+  slug           String        @unique
+  description    String?
+  categoryId     String        @map("category_id")
+  status         ProductStatus @default(draft)
+  price          Int
+  compareAtPrice Int?          @map("compare_at_price")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  category Category         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  options  ProductOption[]
+  variants ProductVariant[]
+
+  @@index([status, categoryId])
+  @@map("products")
+}
+
+/// An option type a product varies by, e.g. Size. Types in use can't be deleted.
+model ProductOption {
+  productId    String @map("product_id")
+  optionTypeId String @map("option_type_id")
+  position     Int    @default(0)
+
+  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  optionType OptionType @relation(fields: [optionTypeId], references: [id], onDelete: Restrict)
+
+  @@id([productId, optionTypeId])
+  @@map("product_options")
+}
+
+/// A sellable combination of option values, e.g. Size M + Colour Black.
+model ProductVariant {
+  id             String   @id @default(cuid(2))
+  productId      String   @map("product_id")
+  sku            String   @unique
+  /// Overrides the product price when set.
+  price          Int?
+  stock          Int      @default(0)
+  position       Int      @default(0)
+  /// Sorted option value ids joined with "+": one variant per combination.
+  combinationKey String   @map("combination_key")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  product      Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  optionValues VariantOptionValue[]
+
+  @@unique([productId, combinationKey], map: "product_variants_combination_key")
+  @@index([productId, position])
+  @@map("product_variants")
+}
+
+/// The option values that define a variant. Values in use can't be deleted.
+model VariantOptionValue {
+  variantId     String @map("variant_id")
+  optionValueId String @map("option_value_id")
+
+  variant     ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  optionValue OptionValue    @relation(fields: [optionValueId], references: [id], onDelete: Restrict)
+
+  @@id([variantId, optionValueId])
+  @@index([optionValueId])
+  @@map("variant_option_values")
 }

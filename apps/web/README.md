@@ -35,7 +35,9 @@ it, so session cookies stay first-party on the web origin.
 
 ## Admin
 
-`/admin` (admins only) has Customers, Categories and Options. Changes go through Server
+`/admin` (admins only) has Customers, Products, Categories and Options. Products are
+created as drafts, get variants (generated from their options or added one by one) and can
+then be published. Changes go through Server
 Actions that re-check the admin role, validate with the shared schemas and call the API
 through `src/lib/api/server.ts`, which forwards the visitor's cookie and origin.
 
