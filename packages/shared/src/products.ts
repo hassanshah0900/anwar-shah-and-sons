@@ -39,6 +39,34 @@ export const productOptionSchema = z.object({
 });
 export type ProductOption = z.infer<typeof productOptionSchema>;
 
+// ─── Images ─────────────────────────────────────────────────────────────────
+
+/** Image types accepted for upload. SVG is excluded: it can carry scripts. */
+export const imageContentTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'] as const;
+export type ImageContentType = (typeof imageContentTypes)[number];
+export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+export const MAX_PRODUCT_IMAGES = 20;
+
+export const productImageSchema = z.object({
+  id: idSchema,
+  /** Path under the media route, e.g. products/abc/xyz.webp. */
+  key: z.string(),
+  alt: z.string(),
+  position: z.number().int(),
+  /** Show this image for one option value, e.g. the Black colour; null for all. */
+  optionValueId: idSchema.nullable(),
+});
+export type ProductImage = z.infer<typeof productImageSchema>;
+
+export const productImageUpdateSchema = z
+  .object({
+    alt: z.string().trim().max(200, 'Use at most 200 characters'),
+    position: z.number().int().nonnegative(),
+    optionValueId: idSchema.nullable(),
+  })
+  .partial();
+export type ProductImageUpdate = z.infer<typeof productImageUpdateSchema>;
+
 export const productSchema = z.object({
   id: idSchema,
   name: z.string(),
@@ -50,6 +78,7 @@ export const productSchema = z.object({
   compareAtPrice: moneySchema.nullable(),
   options: z.array(productOptionSchema),
   variants: z.array(variantSchema),
+  images: z.array(productImageSchema),
 });
 export type Product = z.infer<typeof productSchema>;
 

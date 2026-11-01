@@ -29,6 +29,10 @@ export const productSelect = {
     },
     orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
   },
+  images: {
+    select: { id: true, storageKey: true, alt: true, position: true, optionValueId: true },
+    orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+  },
 } satisfies Prisma.ProductSelect;
 
 type ProductRow = Prisma.ProductGetPayload<{ select: typeof productSelect }>;
@@ -57,5 +61,6 @@ export function toProduct(row: ProductRow): Product {
       position: variant.position,
       optionValueIds: variant.optionValues.map((value) => value.optionValueId),
     })),
+    images: row.images.map(({ storageKey, ...image }) => ({ ...image, key: storageKey })),
   };
 }
