@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { flattenCategoryTree } from '@/lib/catalog/category-tree';
-import { formList, initialActionState, type ActionState } from '@/lib/forms/action-state';
+import { formList, formKey, initialActionState, type ActionState } from '@/lib/forms/action-state';
 import { priceInputValue } from '@/lib/money';
 
 type ProductFormProps = {
@@ -34,6 +34,8 @@ type ProductFormProps = {
   /** Edit this product; create a new one when omitted. */
   product?: Product;
 };
+
+const statusLabel = { draft: 'Draft', active: 'Active', archived: 'Archived' };
 
 const statusHelp = {
   draft: 'Hidden from the store while you prepare it.',
@@ -53,7 +55,7 @@ export function ProductForm({ action, categories, optionTypes, store, product }:
   );
 
   return (
-    <form action={formAction} className="grid max-w-3xl gap-8" noValidate>
+    <form key={formKey(state)} action={formAction} className="grid max-w-3xl gap-8" noValidate>
       {product && <input type="hidden" name="id" value={product.id} />}
       {state.status === 'success' && state.message && (
         <p role="status" className="border px-3 py-2 text-sm">
@@ -148,7 +150,7 @@ export function ProductForm({ action, categories, optionTypes, store, product }:
                   className="mt-0.5"
                 />
                 <Label htmlFor={`status-${status}`} className="grid gap-0.5 font-normal">
-                  <span className="font-medium capitalize">{status}</span>
+                  <span className="font-medium">{statusLabel[status]}</span>
                   <span className="text-muted-foreground">
                     {locked ? 'Add a variant before publishing.' : statusHelp[status]}
                   </span>
