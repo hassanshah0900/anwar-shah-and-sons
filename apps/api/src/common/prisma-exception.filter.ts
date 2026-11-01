@@ -43,6 +43,9 @@ export class PrismaExceptionFilter implements ExceptionFilter {
   }
 }
 
+/** Labels for fields whose generated name reads badly, such as abbreviations. */
+const FIELD_LABELS: Record<string, string> = { sku: 'SKU' };
+
 /**
  * The field a unique violation is about, from the driver's constraint name.
  * Prisma names unique indexes `<table>_<field>_key`; composite uniques set an
@@ -59,5 +62,6 @@ function uniqueFields(error: Prisma.PrismaClientKnownRequestError): string | und
   if (!index || !cause?.table) return undefined;
 
   const field = index.replace(`${cause.table}_`, '').replace(/_key$/, '');
-  return field ? field.replaceAll('_', ' ').replace(/^./, (c) => c.toUpperCase()) : undefined;
+  if (!field) return undefined;
+  return FIELD_LABELS[field] ?? field.replaceAll('_', ' ').replace(/^./, (c) => c.toUpperCase());
 }
