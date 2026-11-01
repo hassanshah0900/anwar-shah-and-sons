@@ -21,6 +21,16 @@ describe('productInputSchema', () => {
     expect(result.error?.issues[0]?.path).toEqual(['compareAtPrice']);
   });
 
+  it('explains a missing or unreadable price', () => {
+    const { price: _price, ...withoutPrice } = base;
+    expect(productInputSchema.safeParse(withoutPrice).error?.issues[0]?.message).toBe(
+      'Enter an amount',
+    );
+    expect(
+      productInputSchema.safeParse({ ...base, price: Number.NaN }).error?.issues[0]?.message,
+    ).toBe('Enter a valid amount');
+  });
+
   it('rejects fractional and negative prices', () => {
     expect(productInputSchema.safeParse({ ...base, price: 49.9 }).success).toBe(false);
     expect(productInputSchema.safeParse({ ...base, price: -1 }).success).toBe(false);

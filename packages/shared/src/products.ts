@@ -4,7 +4,12 @@ import { slugSchema } from './slug.js';
 
 const idSchema = z.string().min(1);
 /** An amount in the store currency's minor unit (see money.ts). */
-const moneySchema = z.number().int('Use a whole amount').nonnegative('Use a positive amount');
+const moneySchema = z
+  .number({
+    error: (issue) => (issue.input === undefined ? 'Enter an amount' : 'Enter a valid amount'),
+  })
+  .int('Use a whole amount')
+  .nonnegative('Use a positive amount');
 
 /** Draft products are hidden from the store; archived ones are retired but kept. */
 export const productStatuses = ['draft', 'active', 'archived'] as const;
