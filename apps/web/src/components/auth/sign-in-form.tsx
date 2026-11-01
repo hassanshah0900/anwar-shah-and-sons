@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { z } from 'zod';
-import { signInSchema } from '@repo/shared';
+import { ADMIN_ROLE, signInSchema } from '@repo/shared';
 import { Button } from '@/components/ui/button';
 import { authClient, authErrorMessage } from '@/lib/auth/client';
 import { safeCallbackUrl } from '@/lib/auth/redirect';
@@ -15,7 +15,8 @@ type FieldErrors = Partial<Record<'email' | 'password', string>>;
 
 export function SignInForm() {
   const router = useRouter();
-  const callbackUrl = safeCallbackUrl(useSearchParams().get('callbackUrl'));
+  const requested = useSearchParams().get('callbackUrl');
+  const callbackUrl = safeCallbackUrl(requested);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -33,14 +34,16 @@ export function SignInForm() {
     setFieldErrors({});
 
     setPending(true);
-    const { error } = await authClient.signIn.email(parsed.data);
+    const { data, error } = await authClient.signIn.email(parsed.data);
     if (error) {
       setFormError(authErrorMessage(error));
       setPending(false);
       return;
     }
 
-    router.replace(callbackUrl);
+    // Admins land in the admin area unless they were sent here from a specific page.
+    const isAdmin = (data.user as { role?: string }).role === ADMIN_ROLE;
+    router.replace(!requested && isAdmin ? '/admin' : callbackUrl);
     router.refresh();
   }
 
