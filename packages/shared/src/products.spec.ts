@@ -4,6 +4,7 @@ import {
   productUpdateSchema,
   skuSchema,
   variantInputSchema,
+  variantUpdateSchema,
 } from './products.js';
 
 const base = { name: 'Lawn Kurta', categoryId: 'c1', price: 4990 };
@@ -57,5 +58,12 @@ describe('variantInputSchema', () => {
   it('defaults stock to zero and rejects negative stock', () => {
     expect(variantInputSchema.parse({ sku: 'A' }).stock).toBe(0);
     expect(variantInputSchema.safeParse({ sku: 'A', stock: -1 }).success).toBe(false);
+  });
+});
+
+describe('partial updates', () => {
+  it('leave out fields that were not sent instead of applying create defaults', () => {
+    expect(productUpdateSchema.parse({ name: 'Renamed' })).toEqual({ name: 'Renamed' });
+    expect(variantUpdateSchema.parse({ price: 5490 })).toEqual({ price: 5490 });
   });
 });

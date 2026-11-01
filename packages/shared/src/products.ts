@@ -78,22 +78,24 @@ export type ProductListQuery = z.infer<typeof productListQuerySchema>;
 
 // ─── Inputs ─────────────────────────────────────────────────────────────────
 
+const optionTypeIdsSchema = z
+  .array(idSchema)
+  .max(MAX_PRODUCT_OPTIONS, `Use at most ${MAX_PRODUCT_OPTIONS} options`)
+  .refine((ids) => new Set(ids).size === ids.length, 'Choose each option once');
+
+// No defaults here: partial updates must not fill in missing fields.
 const productFields = z.object({
   name: z.string().trim().min(1, 'Enter a name').max(120),
   /** Derived from the name when omitted. */
   slug: slugSchema.optional(),
   description: z.string().trim().max(5000).nullish(),
   categoryId: idSchema.min(1, 'Choose a category'),
-  status: productStatusSchema.default('draft'),
+  status: productStatusSchema,
   price: moneySchema,
   /** The "was" price shown struck through; must be above the price. */
   compareAtPrice: moneySchema.nullish(),
   /** Option types this product varies by, in display order. */
-  optionTypeIds: z
-    .array(idSchema)
-    .max(MAX_PRODUCT_OPTIONS, `Use at most ${MAX_PRODUCT_OPTIONS} options`)
-    .refine((ids) => new Set(ids).size === ids.length, 'Choose each option once')
-    .default([]),
+  optionTypeIds: optionTypeIdsSchema,
 });
 
 const compareAtAbovePrice = (input: { price?: number; compareAtPrice?: number | null }) =>
@@ -103,7 +105,12 @@ const compareAtMessage = {
   path: ['compareAtPrice'],
 };
 
-export const productInputSchema = productFields.refine(compareAtAbovePrice, compareAtMessage);
+export const productInputSchema = productFields
+  .extend({
+    status: productStatusSchema.default('draft'),
+    optionTypeIds: optionTypeIdsSchema.default([]),
+  })
+  .refine(compareAtAbovePrice, compareAtMessage);
 export type ProductInput = z.infer<typeof productInputSchema>;
 
 export const productUpdateSchema = productFields
@@ -123,14 +130,19 @@ export const skuSchema = z
       .regex(/^[A-Z0-9]+(?:-[A-Z0-9]+)*$/, 'Use letters, numbers and single hyphens'),
   );
 
+const stockSchema = z.number().int('Use a whole number').nonnegative('Stock cannot be negative');
+
 export const variantInputSchema = z.object({
   sku: skuSchema,
   price: moneySchema.nullish(),
-  stock: z.number().int('Use a whole number').nonnegative('Stock cannot be negative').default(0),
+  stock: stockSchema.default(0),
   /** One value for each of the product's options. */
   optionValueIds: z.array(idSchema).default([]),
 });
 export type VariantInput = z.infer<typeof variantInputSchema>;
 
-export const variantUpdateSchema = variantInputSchema.omit({ optionValueIds: true }).partial();
+// Built without defaults so a partial update never resets stock.
+export const variantUpdateSchema = z
+  .object({ sku: skuSchema, price: moneySchema.nullable(), stock: stockSchema })
+  .partial();
 export type VariantUpdate = z.infer<typeof variantUpdateSchema>;
