@@ -142,7 +142,7 @@ model OptionValue {
 
   optionType OptionType @relation(fields: [optionTypeId], references: [id], onDelete: Cascade)
 
-  @@unique([optionTypeId, slug])
+  @@unique([optionTypeId, slug], map: "option_values_slug_key")
   @@index([optionTypeId, position])
   @@map("option_values")
 }

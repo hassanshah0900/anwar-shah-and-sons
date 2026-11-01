@@ -43,17 +43,21 @@ export class PrismaExceptionFilter implements ExceptionFilter {
   }
 }
 
+/**
+ * The field a unique violation is about, from the driver's constraint name.
+ * Prisma names unique indexes `<table>_<field>_key`; composite uniques set an
+ * explicit `map:` in the schema that follows the same pattern for the field
+ * users can change (e.g. option_values_slug_key).
+ */
 function uniqueFields(error: Prisma.PrismaClientKnownRequestError): string | undefined {
-  const meta = error.meta as
-    | {
-        target?: string[] | string;
-        driverAdapterError?: { cause?: { constraint?: { fields?: string[] } } };
-      }
-    | undefined;
-  const fields = meta?.driverAdapterError?.cause?.constraint?.fields ?? meta?.target;
-  if (!fields) return undefined;
-  const list = (Array.isArray(fields) ? fields : [fields]).map((field) =>
-    field.replaceAll('"', ''),
-  );
-  return list.length ? list.join(', ').replace(/^./, (c) => c.toUpperCase()) : undefined;
+  const cause = (
+    error.meta as
+      | { driverAdapterError?: { cause?: { table?: string; constraint?: { index?: string } } } }
+      | undefined
+  )?.driverAdapterError?.cause;
+  const index = cause?.constraint?.index;
+  if (!index || !cause?.table) return undefined;
+
+  const field = index.replace(`${cause.table}_`, '').replace(/_key$/, '');
+  return field ? field.replaceAll('_', ' ').replace(/^./, (c) => c.toUpperCase()) : undefined;
 }
