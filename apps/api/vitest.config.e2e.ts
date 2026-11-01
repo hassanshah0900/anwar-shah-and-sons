@@ -11,6 +11,8 @@ export default defineConfig({
       NODE_ENV: 'test',
       CORS_ORIGIN: 'http://localhost:3000',
       DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/test',
+      BETTER_AUTH_SECRET: 'e2e-secret-that-is-at-least-32-characters',
+      BETTER_AUTH_URL: 'http://localhost:3000',
     },
   },
 });
