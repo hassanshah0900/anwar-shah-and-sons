@@ -10,13 +10,17 @@ import {
 import { invalidField } from '../../common/zod-validation.pipe.js';
 import type { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { ImagesService } from './images.service.js';
 import { productSelect, toProduct } from './product.mapper.js';
 
 const NEEDS_VARIANT = 'Add at least one variant before publishing';
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly images: ImagesService,
+  ) {}
 
   async list(query: ProductListQuery): Promise<ProductList> {
     const where: Prisma.ProductWhereInput = {
@@ -157,8 +161,13 @@ export class ProductsService {
     return toProduct(row);
   }
 
+  /** Deletes the product, its variants and images, then the stored image files. */
   async remove(id: string): Promise<void> {
-    await this.prisma.product.delete({ where: { id } });
+    const product = await this.prisma.product.delete({
+      where: { id },
+      select: { images: { select: { storageKey: true } } },
+    });
+    await this.images.deleteStored(product.images.map((image) => image.storageKey));
   }
 
   private async assertCategory(id: string): Promise<void> {
