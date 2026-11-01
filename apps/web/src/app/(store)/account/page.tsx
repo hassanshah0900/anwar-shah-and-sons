@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { Suspense } from 'react';
 import { SignOutButton } from '@/components/account/sign-out-button';
+import { ADMIN_ROLE } from '@repo/shared';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { requireUser } from '@/lib/auth/session';
 
@@ -38,7 +41,12 @@ async function AccountDetails() {
           </Badge>
         </Row>
       </dl>
-      <div className="mt-8">
+      <div className="mt-8 flex flex-wrap gap-3">
+        {user.role === ADMIN_ROLE && (
+          <Button asChild>
+            <Link href="/admin">Go to admin</Link>
+          </Button>
+        )}
         <SignOutButton />
       </div>
     </section>
