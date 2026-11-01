@@ -27,6 +27,7 @@ flowchart LR
 | --------- | ---------------------------------------- |
 | Language  | TypeScript (strict)                      |
 | Frontend  | Next.js 16, React 19, Tailwind CSS 4     |
+| UI        | shadcn/ui (Radix), Lucide icons          |
 | Backend   | NestJS 12                                |
 | Database  | PostgreSQL, Prisma 7 (pg driver adapter) |
 | Contracts | Zod 4                                    |
