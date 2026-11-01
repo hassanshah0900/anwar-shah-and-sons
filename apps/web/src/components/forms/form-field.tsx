@@ -8,14 +8,14 @@ type FormFieldProps = React.ComponentProps<typeof Input> & {
 };
 
 /** A labelled input whose error is announced to screen readers. */
-export function FormField({ name, label, error, ...inputProps }: FormFieldProps) {
-  const errorId = `${name}-error`;
+export function FormField({ name, label, error, id = name, ...inputProps }: FormFieldProps) {
+  const errorId = `${id}-error`;
 
   return (
     <div className="grid gap-2">
-      <Label htmlFor={name}>{label}</Label>
+      <Label htmlFor={id}>{label}</Label>
       <Input
-        id={name}
+        id={id}
         name={name}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}

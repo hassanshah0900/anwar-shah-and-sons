@@ -13,11 +13,27 @@ describe('validateEnv', () => {
       ...validEnv,
       NODE_ENV: 'development',
       PORT: 4000,
+      STORE_CURRENCY: 'PKR',
+      STORE_LOCALE: 'en-PK',
     });
   });
 
   it('coerces PORT to a number', () => {
     expect(validateEnv({ ...validEnv, PORT: '8080' }).PORT).toBe(8080);
+  });
+
+  it('accepts a configured currency and normalises its case', () => {
+    expect(validateEnv({ ...validEnv, STORE_CURRENCY: 'usd' }).STORE_CURRENCY).toBe('USD');
+  });
+
+  it('rejects an unknown currency', () => {
+    expect(() => validateEnv({ ...validEnv, STORE_CURRENCY: 'ABC' })).toThrow(/STORE_CURRENCY/);
+  });
+
+  it('rejects a malformed locale', () => {
+    expect(() => validateEnv({ ...validEnv, STORE_LOCALE: 'not a locale!' })).toThrow(
+      /STORE_LOCALE/,
+    );
   });
 
   it('rejects a short BETTER_AUTH_SECRET', () => {

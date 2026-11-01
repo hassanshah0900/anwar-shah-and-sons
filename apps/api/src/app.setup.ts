@@ -1,6 +1,7 @@
 import { INestApplication, NestApplicationOptions, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
+import { PrismaExceptionFilter } from './common/prisma-exception.filter.js';
 import type { Env } from './config/env.js';
 
 /**
@@ -22,5 +23,6 @@ export function configureApp(app: INestApplication): void {
   app.enableCors({ origin: config.get('CORS_ORIGIN', { infer: true }) });
   app.setGlobalPrefix('api');
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
+  app.useGlobalFilters(new PrismaExceptionFilter());
   app.enableShutdownHooks();
 }

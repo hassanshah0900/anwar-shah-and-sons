@@ -8,8 +8,8 @@ import { signInSchema } from '@repo/shared';
 import { Button } from '@/components/ui/button';
 import { authClient, authErrorMessage } from '@/lib/auth/client';
 import { safeCallbackUrl } from '@/lib/auth/redirect';
-import { FormError } from './form-error';
-import { FormField } from './form-field';
+import { FormError } from '@/components/forms/form-error';
+import { FormField } from '@/components/forms/form-field';
 
 type FieldErrors = Partial<Record<'email' | 'password', string>>;
 
