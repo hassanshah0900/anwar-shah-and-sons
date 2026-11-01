@@ -6,6 +6,7 @@ import { OriginGuard } from './common/origin.guard.js';
 import { validateEnv } from './config/env.js';
 import { HealthModule } from './health/health.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { StoreModule } from './store/store.module.js';
 import { UsersModule } from './users/users.module.js';
 
 @Module({
@@ -14,6 +15,7 @@ import { UsersModule } from './users/users.module.js';
     PrismaModule,
     AuthModule,
     HealthModule,
+    StoreModule,
     UsersModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: OriginGuard }],
