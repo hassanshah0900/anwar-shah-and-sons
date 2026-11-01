@@ -1,0 +1,92 @@
+# Anwar Shah & Sons
+
+E-commerce platform for Anwar Shah & Sons: a Next.js storefront and a NestJS REST API, in one
+TypeScript monorepo.
+
+> Infrastructure (AWS, provisioned with Terraform) lives in a separate repository.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    browser([Browser]) --> web["web<br/>Next.js"]
+    web -- "REST /api" --> api["api<br/>NestJS"]
+    api -- Prisma --> db[(PostgreSQL)]
+    shared["@repo/shared<br/>Zod contracts"] -.-> web
+    shared -.-> api
+```
+
+- **`apps/web`**: Next.js (App Router) storefront. Server Components call the API from the server.
+- **`apps/api`**: NestJS REST API. Owns the database through Prisma.
+- **`packages/shared`**: Zod schemas and inferred types for every API contract, used by both
+  apps. A breaking API change fails type checking in the web app.
+
+## Tech stack
+
+| Area      | Choice                                   |
+| --------- | ---------------------------------------- |
+| Language  | TypeScript (strict)                      |
+| Frontend  | Next.js 16, React 19, Tailwind CSS 4     |
+| Backend   | NestJS 12                                |
+| Database  | PostgreSQL, Prisma 7 (pg driver adapter) |
+| Contracts | Zod 4                                    |
+| Testing   | Vitest, Supertest                        |
+| Linting   | ESLint (web), oxlint (api), Prettier     |
+| Monorepo  | npm workspaces, Turborepo                |
+
+## Repository structure
+
+```
+apps/
+  api/            NestJS API
+  web/            Next.js storefront
+packages/
+  shared/         API contracts (Zod schemas + types)
+  tsconfig/       shared TypeScript configs
+docs/
+  adr/            architecture decision records
+```
+
+## Getting started
+
+### Prerequisites
+
+- Node.js 24 (`nvm use`)
+- A PostgreSQL 16+ database you can connect to
+
+### Setup
+
+```bash
+npm install
+
+cp apps/api/.env.example apps/api/.env        # set DATABASE_URL
+cp apps/web/.env.example apps/web/.env.local
+
+npm run dev
+```
+
+| App | URL                              |
+| --- | -------------------------------- |
+| web | http://localhost:3000            |
+| api | http://localhost:4000/api        |
+|     | http://localhost:4000/api/health |
+
+### Scripts
+
+Run from the repository root. Turborepo runs each task in every workspace that defines it.
+
+| Command                | Description                    |
+| ---------------------- | ------------------------------ |
+| `npm run dev`          | Start all apps in watch mode   |
+| `npm run build`        | Build all packages and apps    |
+| `npm run lint`         | Lint all workspaces            |
+| `npm run typecheck`    | Type-check all workspaces      |
+| `npm test`             | Run unit tests                 |
+| `npm run format`       | Format the repo with Prettier  |
+| `npm run format:check` | Check formatting without fixes |
+
+App-specific commands (database migrations, e2e tests) are in each app's README.
+
+## Contributing
+
+This repository follows GitHub Flow and Conventional Commits. See [CONTRIBUTING.md](CONTRIBUTING.md).
