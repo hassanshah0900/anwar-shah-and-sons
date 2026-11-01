@@ -22,15 +22,17 @@ Copy `.env.example` to `.env`. Every variable is validated at startup by
 
 ## Routes
 
-| Route                        | Description                                                           |
-| ---------------------------- | --------------------------------------------------------------------- |
-| `GET /api/health`            | Health check: `200` when all dependencies are up, else `503` (public) |
-| `/api/auth/*`                | Better Auth: sign-up, sign-in, sign-out, session (public)             |
-| `GET /api/v1/users/me`       | The signed-in user                                                    |
-| `GET /api/v1/users`          | All users (admin only)                                                |
-| `GET /api/v1/store`          | Store currency and locale (public)                                    |
-| `/api/v1/admin/categories`   | Category tree: list, create, update, delete (admin)                   |
-| `/api/v1/admin/option-types` | Product options and their values (admin)                              |
+| Route                                 | Description                                                               |
+| ------------------------------------- | ------------------------------------------------------------------------- |
+| `GET /api/health`                     | Health check: `200` when all dependencies are up, else `503` (public)     |
+| `/api/auth/*`                         | Better Auth: sign-up, sign-in, sign-out, session (public)                 |
+| `GET /api/v1/users/me`                | The signed-in user                                                        |
+| `GET /api/v1/users`                   | All users (admin only)                                                    |
+| `GET /api/v1/store`                   | Store currency and locale (public)                                        |
+| `/api/v1/admin/categories`            | Category tree: list, create, update, delete (admin)                       |
+| `/api/v1/admin/option-types`          | Product options and their values (admin)                                  |
+| `/api/v1/admin/products`              | Products: list (filter, search, paginate), create, update, delete (admin) |
+| `/api/v1/admin/products/:id/variants` | Variants: add, update, delete, `POST /generate` all combinations (admin)  |
 
 Every route requires a session unless it is marked `@AllowAnonymous()`, and every write
 must come from the web app's origin (CSRF). Request bodies are validated with the shared
@@ -58,7 +60,7 @@ Run them from this directory, or from the root with `npm run <script> -w api`.
 ```
 src/
   auth/         Better Auth instance and Nest module
-  catalog/      categories and product options
+  catalog/      categories, product options, products and variants
   common/       validation pipe, error filter, origin guard
   config/       environment validation
   prisma/       PrismaService (single client / connection pool)
