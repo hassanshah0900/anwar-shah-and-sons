@@ -30,19 +30,22 @@ role). See [ADR 0007](../../docs/adr/0007-media-storage.md).
 
 ## Routes
 
-| Route                                         | Description                                                                       |
-| --------------------------------------------- | --------------------------------------------------------------------------------- |
-| `GET /api/health`                             | Health check: `200` when all dependencies are up, else `503` (public)             |
-| `/api/auth/*`                                 | Better Auth: sign-up, sign-in, sign-out, session (public)                         |
-| `GET /api/v1/users/me`                        | The signed-in user                                                                |
-| `GET /api/v1/users`                           | All users (admin only)                                                            |
-| `GET /api/v1/store`                           | Store currency and locale (public)                                                |
-| `/api/v1/admin/categories`                    | Category tree: list, create, update, delete (admin)                               |
-| `/api/v1/admin/option-types`                  | Product options and their values (admin)                                          |
-| `/api/v1/admin/products`                      | Products: list (filter, search, paginate), create, update, delete (admin)         |
-| `/api/v1/admin/products/:id/variants`         | Variants: add, update, delete, `POST /generate` all combinations (admin)          |
-| `/api/v1/admin/products/:id/images`           | Images: multipart upload (`file`, `alt`, `optionValueId`), update, delete (admin) |
-| `GET /api/v1/media/products/:productId/:file` | Uploaded images, cached forever (public)                                          |
+| Route                                         | Description                                                                                                           |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/health`                             | Health check: `200` when all dependencies are up, else `503` (public)                                                 |
+| `/api/auth/*`                                 | Better Auth: sign-up, sign-in, sign-out, session (public)                                                             |
+| `GET /api/v1/users/me`                        | The signed-in user                                                                                                    |
+| `GET /api/v1/users`                           | All users (admin only)                                                                                                |
+| `GET /api/v1/store`                           | Store currency and locale (public)                                                                                    |
+| `GET /api/v1/categories`                      | Category tree (public)                                                                                                |
+| `GET /api/v1/products`                        | Active products: `category`, `q`, repeated `option=<option>:<value>`, `minPrice`, `maxPrice`, `sort`, `page` (public) |
+| `GET /api/v1/products/:slug`                  | Product page data with stock levels, not counts (public)                                                              |
+| `/api/v1/admin/categories`                    | Category tree: list, create, update, delete (admin)                                                                   |
+| `/api/v1/admin/option-types`                  | Product options and their values (admin)                                                                              |
+| `/api/v1/admin/products`                      | Products: list (filter, search, paginate), create, update, delete (admin)                                             |
+| `/api/v1/admin/products/:id/variants`         | Variants: add, update, delete, `POST /generate` all combinations (admin)                                              |
+| `/api/v1/admin/products/:id/images`           | Images: multipart upload (`file`, `alt`, `optionValueId`), update, delete (admin)                                     |
+| `GET /api/v1/media/products/:productId/:file` | Uploaded images, cached forever (public)                                                                              |
 
 Every route requires a session unless it is marked `@AllowAnonymous()`, and every write
 must come from the web app's origin (CSRF). Request bodies are validated with the shared
@@ -78,6 +81,7 @@ src/
   store/        store settings endpoint
   storage/      media storage drivers (local, S3) and image type detection
   media/        serves uploaded media
+  storefront/   public catalog: categories, product listing and pages
   users/        current user and admin user list
   generated/    Prisma client (generated, git-ignored)
   app.setup.ts  HTTP setup shared by main.ts and e2e tests
