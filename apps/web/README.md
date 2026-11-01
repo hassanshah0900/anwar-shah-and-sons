@@ -22,6 +22,17 @@ Copy `.env.example` to `.env.local`. Server-side variables are validated by
 | `npm run lint`      | ESLint                            |
 | `npm run typecheck` | TypeScript                        |
 
+## Authentication
+
+Better Auth runs in the API. `src/app/api/auth/[...all]/route.ts` proxies `/api/auth/*` to
+it, so session cookies stay first-party on the web origin.
+
+- **Server:** `src/lib/auth/session.ts` (`getSessionUser`, `requireUser`, `requireAdmin`).
+  Render anything that reads the session inside `<Suspense>`.
+- **Browser:** `src/lib/auth/client.ts` (sign-in, sign-up, sign-out).
+- **`src/proxy.ts`:** redirects visitors without a session cookie away from `/account`
+  and `/admin` before rendering.
+
 ## Design system
 
 Monochrome tokens, a 4px maximum radius and borders over shadows, built on shadcn/ui. The
@@ -39,13 +50,17 @@ rules and their enforcement are described in
 
 ```
 src/
-  app/           routes (App Router); (store) group holds the storefront layout
+  app/           routes (App Router); (store) = storefront, admin = admin area
+  proxy.ts       redirects signed-out visitors from protected routes
   components/
+    account/     account menu and sign-out
+    auth/        sign-in and sign-up forms
     layout/      header, footer, mobile navigation
     ui/          shadcn/ui components, restyled to the design system
   config/        site name and navigation
   lib/
     api/         server-only API clients, validated with @repo/shared schemas
+    auth/        session access, auth client, safe redirects
     env.ts       server environment validation
     fonts.ts     next/font definitions
   styles/        vendored shadcn variants
