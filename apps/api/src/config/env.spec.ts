@@ -15,6 +15,8 @@ describe('validateEnv', () => {
       PORT: 4000,
       STORE_CURRENCY: 'PKR',
       STORE_LOCALE: 'en-PK',
+      STORAGE_DRIVER: 'local',
+      STORAGE_LOCAL_DIR: 'uploads',
     });
   });
 
@@ -34,6 +36,14 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ ...validEnv, STORE_LOCALE: 'not a locale!' })).toThrow(
       /STORE_LOCALE/,
     );
+  });
+
+  it('requires a bucket and region for S3 storage', () => {
+    expect(() => validateEnv({ ...validEnv, STORAGE_DRIVER: 's3' })).toThrow(/S3_BUCKET/);
+    expect(
+      validateEnv({ ...validEnv, STORAGE_DRIVER: 's3', S3_BUCKET: 'media', S3_REGION: 'eu-west-1' })
+        .STORAGE_DRIVER,
+    ).toBe('s3');
   });
 
   it('rejects a short BETTER_AUTH_SECRET', () => {

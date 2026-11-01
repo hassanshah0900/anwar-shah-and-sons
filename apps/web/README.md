@@ -37,7 +37,11 @@ it, so session cookies stay first-party on the web origin.
 
 `/admin` (admins only) has Customers, Products, Categories and Options. Products are
 created as drafts, get variants (generated from their options or added one by one) and can
-then be published. Changes go through Server
+then be published. Each product has an image gallery: uploads are checked in the browser
+and by the API, and images can be tied to an option value such as a colour.
+
+Product images are served at `/media/*`, streamed from the API, and optimised by `next/image`
+(only `/media/**` is allowed). Server Actions accept bodies up to 6 MB for uploads. Changes go through Server
 Actions that re-check the admin role, validate with the shared schemas and call the API
 through `src/lib/api/server.ts`, which forwards the visitor's cookie and origin.
 

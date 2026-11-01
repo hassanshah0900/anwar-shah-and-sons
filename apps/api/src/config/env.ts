@@ -18,9 +18,25 @@ export const envSchema = z.object({
     .default('PKR'),
   /** BCP 47 locale for formatting prices and dates. */
   STORE_LOCALE: z.string().refine(isSupportedLocale, 'Use a locale such as en-PK').default('en-PK'),
+  /** Where uploaded media is stored: a local directory or an S3 bucket. */
+  STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
+  /** Directory for the local driver, relative to the API's working directory. */
+  STORAGE_LOCAL_DIR: z.string().min(1).default('uploads'),
+  S3_BUCKET: z.string().min(1).optional(),
+  S3_REGION: z.string().min(1).optional(),
+  /** Custom endpoint for S3-compatible storage (e.g. MinIO); omit for AWS. */
+  S3_ENDPOINT: z.url().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
+
+const validatedEnvSchema = envSchema.superRefine((env, ctx) => {
+  if (env.STORAGE_DRIVER !== 's3') return;
+  for (const key of ['S3_BUCKET', 'S3_REGION'] as const) {
+    if (!env[key])
+      ctx.addIssue({ code: 'custom', path: [key], message: 'Required when STORAGE_DRIVER=s3' });
+  }
+});
 
 function isSupportedCurrency(code: string): boolean {
   return Intl.supportedValuesOf('currency').includes(code);
@@ -39,7 +55,7 @@ function isSupportedLocale(locale: string): boolean {
  * immediately with a readable message instead of at the first request.
  */
 export function validateEnv(config: Record<string, unknown>): Env {
-  const result = envSchema.safeParse(config);
+  const result = validatedEnvSchema.safeParse(config);
 
   if (!result.success) {
     throw new Error(`Invalid environment variables:\n${z.prettifyError(result.error)}`);
