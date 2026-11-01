@@ -19,6 +19,7 @@ export class ApiError extends Error {
 
 type ApiRequest = {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  /** JSON-serialisable data, or FormData for multipart uploads. */
   body?: unknown;
 };
 
@@ -48,13 +49,15 @@ async function send(path: string, method: string, body: unknown): Promise<Respon
   const outgoing = new Headers({ cookie: incoming.get('cookie') ?? '' });
   const origin = incoming.get('origin');
   if (method !== 'GET' && origin) outgoing.set('origin', origin);
-  if (body !== undefined) outgoing.set('content-type', 'application/json');
+  // FormData (file uploads) sets its own multipart content type and boundary.
+  const isForm = body instanceof FormData;
+  if (body !== undefined && !isForm) outgoing.set('content-type', 'application/json');
 
   const response = await fetch(new URL(path, API_URL), {
     method,
     headers: outgoing,
-    body: body === undefined ? undefined : JSON.stringify(body),
-    signal: AbortSignal.timeout(10_000),
+    body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
+    signal: AbortSignal.timeout(isForm ? 30_000 : 10_000),
   });
 
   if (!response.ok) {
