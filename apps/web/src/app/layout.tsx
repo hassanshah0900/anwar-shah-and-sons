@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Providers } from '@/components/providers';
 import { fontVariables } from '@/lib/fonts';
 import { cn } from '@/lib/utils';
 import './globals.css';
@@ -13,8 +14,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
-    <html lang="en" className={cn(fontVariables, 'h-full antialiased')}>
-      <body className="flex min-h-full flex-col">{children}</body>
+    // next-themes sets the theme class before hydration, so React must not warn about it.
+    <html lang="en" className={cn(fontVariables, 'h-full antialiased')} suppressHydrationWarning>
+      <body className="flex min-h-full flex-col">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }
