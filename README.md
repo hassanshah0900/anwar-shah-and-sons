@@ -53,18 +53,25 @@ docs/
 ### Prerequisites
 
 - Node.js 24 (`nvm use`)
-- A PostgreSQL 16+ database you can connect to
+- Docker (for the local PostgreSQL database)
 
 ### Setup
 
 ```bash
 npm install
 
-cp apps/api/.env.example apps/api/.env        # set DATABASE_URL
+cp .env.example .env                          # choose a POSTGRES_PASSWORD
+cp apps/api/.env.example apps/api/.env        # use the same password in DATABASE_URL
 cp apps/web/.env.example apps/web/.env.local
 
+docker compose up -d                          # PostgreSQL on localhost:5432
 npm run dev
 ```
+
+The local database is PostgreSQL 17 in Docker. The password is passed to the container as
+a Compose secret, not an environment variable. Stop it with `docker compose down`; add `-v`
+to delete its data. Production uses Aurora PostgreSQL, provisioned in the infrastructure
+repository.
 
 | App | URL                              |
 | --- | -------------------------------- |
