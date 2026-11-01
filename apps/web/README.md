@@ -33,6 +33,12 @@ it, so session cookies stay first-party on the web origin.
 - **`src/proxy.ts`:** redirects visitors without a session cookie away from `/account`
   and `/admin` before rendering.
 
+## Admin
+
+`/admin` (admins only) has Customers, Categories and Options. Changes go through Server
+Actions that re-check the admin role, validate with the shared schemas and call the API
+through `src/lib/api/server.ts`, which forwards the visitor's cookie and origin.
+
 ## Design system
 
 Monochrome tokens, a 4px maximum radius and borders over shadows, built on shadcn/ui. The
@@ -54,6 +60,7 @@ src/
   proxy.ts       redirects signed-out visitors from protected routes
   components/
     account/     account menu and sign-out
+    admin/       admin navigation, dialogs, swatches
     auth/        sign-in and sign-up forms
     layout/      header, footer, mobile navigation
     ui/          shadcn/ui components, restyled to the design system
@@ -61,6 +68,8 @@ src/
   lib/
     api/         server-only API clients, validated with @repo/shared schemas
     auth/        session access, auth client, safe redirects
+    catalog/     category tree helpers
+    forms/       Server Action form state
     env.ts       server environment validation
     fonts.ts     next/font definitions
   styles/        vendored shadcn variants
