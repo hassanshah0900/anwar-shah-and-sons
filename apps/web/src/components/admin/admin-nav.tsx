@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 
 const links = [
   { href: '/admin', label: 'Customers' },
+  { href: '/admin/products', label: 'Products' },
   { href: '/admin/categories', label: 'Categories' },
   { href: '/admin/options', label: 'Options' },
 ];
@@ -17,7 +18,8 @@ export function AdminNav() {
     <nav aria-label="Admin" className="border-b">
       <ul className="page-container flex gap-6 overflow-x-auto">
         {links.map((link) => {
-          const active = pathname === link.href;
+          const active =
+            link.href === '/admin' ? pathname === link.href : pathname.startsWith(link.href);
           return (
             <li key={link.href}>
               <Link
