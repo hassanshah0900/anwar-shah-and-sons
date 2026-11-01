@@ -32,3 +32,13 @@ export function submittedValues(formData: FormData): Record<string, string> {
 export function formList(values: Record<string, string>, name: string): string[] {
   return values[name]?.split(',').filter(Boolean) ?? [];
 }
+
+/**
+ * A key that changes when an action returns new values. Put it on a form so its
+ * fields remount with those values as defaults: React resets forms after an
+ * action, and stateful inputs (Radix Select, Checkbox) would otherwise snap back
+ * to their first defaults.
+ */
+export function formKey(state: ActionState): string {
+  return state.values ? JSON.stringify(state.values) : 'initial';
+}

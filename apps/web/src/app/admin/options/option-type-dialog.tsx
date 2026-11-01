@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { initialActionState, type ActionState } from '@/lib/forms/action-state';
+import { formKey, initialActionState, type ActionState } from '@/lib/forms/action-state';
 import { saveOptionType } from './actions';
 
 /** Creates an option type, or renames `optionType` when given. */
@@ -46,7 +46,7 @@ export function OptionTypeDialog({ optionType }: { optionType?: OptionType }) {
         )}
       </DialogTrigger>
       <DialogContent>
-        <form action={formAction} className="grid gap-5" noValidate>
+        <form key={formKey(state)} action={formAction} className="grid gap-5" noValidate>
           {optionType && <input type="hidden" name="id" value={optionType.id} />}
           <DialogHeader>
             <DialogTitle>{optionType ? 'Rename option' : 'New option'}</DialogTitle>

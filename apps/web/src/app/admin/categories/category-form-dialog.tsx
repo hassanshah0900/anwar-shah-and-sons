@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { descendantIds, flattenCategoryTree } from '@/lib/catalog/category-tree';
-import { initialActionState, type ActionState } from '@/lib/forms/action-state';
+import { formKey, initialActionState, type ActionState } from '@/lib/forms/action-state';
 import { saveCategory } from './actions';
 
 type CategoryFormDialogProps = {
@@ -61,7 +61,7 @@ export function CategoryFormDialog({ categories, category }: CategoryFormDialogP
         )}
       </DialogTrigger>
       <DialogContent>
-        <form action={formAction} className="grid gap-5" noValidate>
+        <form key={formKey(state)} action={formAction} className="grid gap-5" noValidate>
           {category && <input type="hidden" name="id" value={category.id} />}
           <DialogHeader>
             <DialogTitle>{category ? 'Edit category' : 'New category'}</DialogTitle>
