@@ -27,6 +27,9 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv) {
     },
     plugins: [admin({ defaultRole: DEFAULT_ROLE, adminRoles: [ADMIN_ROLE] })],
     advanced: {
+      // Better Auth skips the origin (CSRF) check when NODE_ENV=test; keep it on
+      // everywhere so tests exercise the same protection as production.
+      disableOriginCheck: false,
       // The web app proxies auth requests, so the client IP arrives in this header.
       ipAddress: { ipAddressHeaders: ['x-forwarded-for'] },
     },
