@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { AdminNav } from '@/components/admin/admin-nav';
+import { Skeleton } from '@/components/ui/skeleton';
 import { siteConfig } from '@/config/site';
 import { requireAdmin } from '@/lib/auth/session';
 
@@ -13,7 +14,7 @@ export const metadata: Metadata = {
 /** Admin chrome, separate from the storefront and rendered only for admins. */
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <Suspense>
+    <Suspense fallback={<AdminLoading />}>
       <AdminShell>{children}</AdminShell>
     </Suspense>
   );
@@ -44,5 +45,15 @@ async function AdminShell({ children }: { children: React.ReactNode }) {
       <AdminNav />
       <div className="flex flex-1 flex-col">{children}</div>
     </>
+  );
+}
+
+/** Neutral placeholder while the role is checked; reveals nothing admin-specific. */
+function AdminLoading() {
+  return (
+    <div className="page-container space-y-4 py-12" aria-busy="true">
+      <Skeleton className="h-10 w-48" />
+      <Skeleton className="h-64 w-full" />
+    </div>
   );
 }
