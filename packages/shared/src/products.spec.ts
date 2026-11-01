@@ -65,6 +65,12 @@ describe('skuSchema', () => {
 });
 
 describe('variantInputSchema', () => {
+  it('explains unreadable stock', () => {
+    expect(
+      variantInputSchema.safeParse({ sku: 'A', stock: Number.NaN }).error?.issues[0]?.message,
+    ).toBe('Enter a whole number');
+  });
+
   it('defaults stock to zero and rejects negative stock', () => {
     expect(variantInputSchema.parse({ sku: 'A' }).stock).toBe(0);
     expect(variantInputSchema.safeParse({ sku: 'A', stock: -1 }).success).toBe(false);

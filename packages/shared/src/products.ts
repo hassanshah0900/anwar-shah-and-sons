@@ -135,7 +135,10 @@ export const skuSchema = z
       .regex(/^[A-Z0-9]+(?:-[A-Z0-9]+)*$/, 'Use letters, numbers and single hyphens'),
   );
 
-const stockSchema = z.number().int('Use a whole number').nonnegative('Stock cannot be negative');
+const stockSchema = z
+  .number({ error: 'Enter a whole number' })
+  .int('Enter a whole number')
+  .nonnegative('Stock cannot be negative');
 
 export const variantInputSchema = z.object({
   sku: skuSchema,
