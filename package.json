@@ -1,0 +1,26 @@
+{
+  "name": "anwar-shah-and-sons",
+  "private": true,
+  "description": "E-commerce platform for Anwar Shah & Sons: Next.js storefront and NestJS API",
+  "packageManager": "npm@11.19.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2",
+    "turbo": "^2.11.10"
+  }
+}
