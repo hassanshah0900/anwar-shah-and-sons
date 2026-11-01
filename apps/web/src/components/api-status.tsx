@@ -1,9 +1,9 @@
 import { getApiHealth } from '@/lib/api/health';
 
 const dotColor = {
-  up: 'bg-emerald-500',
-  degraded: 'bg-amber-500',
-  down: 'bg-red-500',
+  up: 'bg-success',
+  degraded: 'bg-muted-foreground',
+  down: 'bg-destructive',
 } as const;
 
 /** Server component showing live API health. Uncached: render it inside <Suspense>. */
@@ -27,7 +27,7 @@ export async function ApiStatus() {
 }
 
 export function ApiStatusSkeleton() {
-  return <p className="text-sm text-zinc-500">Checking API status…</p>;
+  return <p className="text-sm text-muted-foreground">Checking API status…</p>;
 }
 
 function StatusLine({
@@ -40,10 +40,10 @@ function StatusLine({
   detail?: string;
 }) {
   return (
-    <p className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+    <p className="flex items-center gap-2 text-sm text-foreground">
       <span aria-hidden className={`size-2 rounded-full ${dotColor[state]}`} />
       <span className="font-medium">{label}</span>
-      {detail && <span className="text-zinc-500">({detail})</span>}
+      {detail && <span className="text-muted-foreground">({detail})</span>}
     </p>
   );
 }
