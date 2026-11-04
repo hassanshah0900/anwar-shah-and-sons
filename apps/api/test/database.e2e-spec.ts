@@ -29,4 +29,10 @@ describe('E2E database isolation', () => {
       await prisma.user.delete({ where: { email: marker } });
     }
   });
+
+  it('runs raw SQL against the e2e schema too', async () => {
+    const rows = await app.get(PrismaService).$queryRaw<{ schema: string }[]>`
+      SELECT current_schema() AS schema`;
+    expect(rows[0]?.schema).toBe('e2e');
+  });
 });
