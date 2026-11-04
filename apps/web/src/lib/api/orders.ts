@@ -6,6 +6,7 @@ import {
   type Order,
   type OrderList,
   type OrderListQuery,
+  type OrderStatus,
 } from '@repo/shared';
 import { apiRequest } from './server';
 
@@ -28,4 +29,19 @@ export function getMyOrders(query: Partial<OrderListQuery> = {}): Promise<OrderL
 
 export function getMyOrder(number: number): Promise<Order> {
   return apiRequest(`/api/v1/orders/${number}`, orderSchema);
+}
+
+export function getAdminOrders(query: Partial<OrderListQuery> = {}): Promise<OrderList> {
+  return apiRequest(`/api/v1/admin/orders${listParams(query)}`, orderListSchema);
+}
+
+export function getAdminOrder(number: number): Promise<Order> {
+  return apiRequest(`/api/v1/admin/orders/${number}`, orderSchema);
+}
+
+export function updateOrderStatus(number: number, status: OrderStatus): Promise<Order> {
+  return apiRequest(`/api/v1/admin/orders/${number}`, orderSchema, {
+    method: 'PATCH',
+    body: { status },
+  });
 }

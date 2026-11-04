@@ -10,7 +10,16 @@ export function formatOrderDate(iso: string, store: StoreConfig): string {
 }
 
 /** An order's lines, totals, address and payment, as shown to customers and admins. */
-export function OrderDetails({ order, store }: { order: Order; store: StoreConfig }) {
+export function OrderDetails({
+  order,
+  store,
+  showSku = false,
+}: {
+  order: Order;
+  store: StoreConfig;
+  /** For staff picking the order. */
+  showSku?: boolean;
+}) {
   // Amounts are in the order's currency, which may differ from today's store currency.
   const money = { currency: order.currency, locale: store.locale };
   const { address } = order;
@@ -45,6 +54,9 @@ export function OrderDetails({ order, store }: { order: Order; store: StoreConfi
                 )}
                 {item.variantLabel && (
                   <span className="text-muted-foreground">{item.variantLabel}</span>
+                )}
+                {showSku && (
+                  <span className="font-mono text-xs text-muted-foreground">SKU {item.sku}</span>
                 )}
                 <span className="text-muted-foreground tabular-nums">
                   {item.quantity} × {formatPrice(item.unitPrice, money)}
