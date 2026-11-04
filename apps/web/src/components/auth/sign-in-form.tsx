@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { z } from 'zod';
 import { ADMIN_ROLE, signInSchema } from '@repo/shared';
@@ -14,7 +14,6 @@ import { FormField } from '@/components/forms/form-field';
 type FieldErrors = Partial<Record<'email' | 'password', string>>;
 
 export function SignInForm() {
-  const router = useRouter();
   const requested = useSearchParams().get('callbackUrl');
   const callbackUrl = safeCallbackUrl(requested);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -43,8 +42,9 @@ export function SignInForm() {
 
     // Admins land in the admin area unless they were sent here from a specific page.
     const isAdmin = (data.user as { role?: string }).role === ADMIN_ROLE;
-    router.replace(!requested && isAdmin ? '/admin' : callbackUrl);
-    router.refresh();
+    // A full page load: the browser's route cache may still hold "redirect to
+    // sign-in" for protected pages visited while signed out.
+    window.location.replace(!requested && isAdmin ? '/admin' : callbackUrl);
   }
 
   return (
