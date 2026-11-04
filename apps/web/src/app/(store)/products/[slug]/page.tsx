@@ -2,12 +2,14 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Fragment, Suspense } from 'react';
+import { JsonLd } from '@/components/seo/json-ld';
 import { ProductView } from '@/components/shop/product-view';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getProductDetail } from '@/lib/api/catalog';
 import { ApiError } from '@/lib/api/server';
 import { getStoreConfig } from '@/lib/api/store';
 import { initialSelection } from '@/lib/catalog/variant-selection';
+import { breadcrumbJsonLd, productJsonLd } from '@/lib/seo/structured-data';
 
 type Props = PageProps<'/products/[slug]'>;
 
@@ -28,6 +30,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: product.name,
     description,
+    // Variant choices (?colour=…&size=…) are the same page.
+    alternates: { canonical: `/products/${product.slug}` },
     openGraph: {
       title: product.name,
       description,
@@ -58,39 +62,48 @@ async function Product({ params, searchParams }: Props) {
   ];
 
   return (
-    <ProductView
-      product={product}
-      store={store}
-      initialSelection={initialSelection(product, query)}
-      header={
-        <>
-          <nav aria-label="Breadcrumb">
-            <ol className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              {crumbs.map((crumb, index) => (
-                <Fragment key={crumb.href}>
-                  {index > 0 && <li aria-hidden>/</li>}
-                  <li>
-                    <Link href={crumb.href} className="hover:text-foreground">
-                      {crumb.name}
-                    </Link>
-                  </li>
-                </Fragment>
-              ))}
-            </ol>
-          </nav>
-          <h1 className="text-4xl sm:text-5xl">{product.name}</h1>
-        </>
-      }
-    >
-      {product.description && (
-        <section className="flex flex-col gap-3 border-t pt-8">
-          <h2 className="font-sans text-xs font-medium tracking-widest text-muted-foreground uppercase">
-            Details
-          </h2>
-          <p className="text-sm leading-7 whitespace-pre-line">{product.description}</p>
-        </section>
-      )}
-    </ProductView>
+    <>
+      <JsonLd data={productJsonLd(product, store)} />
+      <JsonLd
+        data={breadcrumbJsonLd([
+          ...crumbs,
+          { name: product.name, href: `/products/${product.slug}` },
+        ])}
+      />
+      <ProductView
+        product={product}
+        store={store}
+        initialSelection={initialSelection(product, query)}
+        header={
+          <>
+            <nav aria-label="Breadcrumb">
+              <ol className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                {crumbs.map((crumb, index) => (
+                  <Fragment key={crumb.href}>
+                    {index > 0 && <li aria-hidden>/</li>}
+                    <li>
+                      <Link href={crumb.href} className="hover:text-foreground">
+                        {crumb.name}
+                      </Link>
+                    </li>
+                  </Fragment>
+                ))}
+              </ol>
+            </nav>
+            <h1 className="text-4xl sm:text-5xl">{product.name}</h1>
+          </>
+        }
+      >
+        {product.description && (
+          <section className="flex flex-col gap-3 border-t pt-8">
+            <h2 className="font-sans text-xs font-medium tracking-widest text-muted-foreground uppercase">
+              Details
+            </h2>
+            <p className="text-sm leading-7 whitespace-pre-line">{product.description}</p>
+          </section>
+        )}
+      </ProductView>
+    </>
   );
 }
 

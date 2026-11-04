@@ -7,10 +7,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { readListingState } from '@/lib/catalog/listing-params';
 
-export const metadata: Metadata = {
-  title: 'Shop all',
-  description: 'Browse every product at Anwar Shah & Sons.',
-};
+/** Filtered and sorted views point search engines at the plain listing; searches aren't indexed. */
+export async function generateMetadata({ searchParams }: PageProps<'/shop'>): Promise<Metadata> {
+  const { q } = await searchParams;
+  return {
+    title: q ? `Search: ${String(q)}` : 'Shop all',
+    description: 'Browse every product at Anwar Shah & Sons.',
+    alternates: { canonical: '/shop' },
+    ...(q && { robots: { index: false, follow: true } }),
+  };
+}
 
 export default function ShopPage({ searchParams }: PageProps<'/shop'>) {
   return (

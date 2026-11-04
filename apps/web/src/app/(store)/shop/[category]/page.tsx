@@ -22,6 +22,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: category.name,
     description: category.description ?? `Shop ${category.name} at Anwar Shah & Sons.`,
+    // Filters, sorting and pages are views of the same category.
+    alternates: { canonical: `/shop/${category.slug}` },
   };
 }
 
