@@ -40,6 +40,10 @@ role). See [ADR 0007](../../docs/adr/0007-media-storage.md).
 | `GET /api/v1/categories`                      | Category tree (public)                                                                                                |
 | `GET /api/v1/products`                        | Active products: `category`, `q`, repeated `option=<option>:<value>`, `minPrice`, `maxPrice`, `sort`, `page` (public) |
 | `GET /api/v1/products/:slug`                  | Product page data with stock levels, not counts (public)                                                              |
+| `GET /api/v1/cart`                            | The visitor's cart, with live prices and stock levels (public)                                                        |
+| `POST /api/v1/cart/items`                     | Add `{ variantId, quantity }`; a guest's first add returns a new cart token (public)                                  |
+| `PATCH /api/v1/cart/items/:variantId`         | Set `{ quantity }`; `0` removes the line (public)                                                                     |
+| `DELETE /api/v1/cart/items/:variantId`        | Remove a line (public)                                                                                                |
 | `/api/v1/admin/categories`                    | Category tree: list, create, update, delete (admin)                                                                   |
 | `/api/v1/admin/option-types`                  | Product options and their values (admin)                                                                              |
 | `/api/v1/admin/products`                      | Products: list (filter, search, paginate), create, update, delete (admin)                                             |
@@ -51,6 +55,17 @@ Every route requires a session unless it is marked `@AllowAnonymous()`, and ever
 must come from the web app's origin (CSRF). Request bodies are validated with the shared
 Zod schemas. See
 [ADR 0005](../../docs/adr/0005-authentication-with-better-auth.md).
+
+## Cart
+
+Signed-in customers' carts belong to their account. Guests get a random token on their
+first add, which the web app keeps in a cookie and sends back in the `x-cart-token` header;
+only its SHA-256 hash is stored. When a customer is signed in and still holds a guest token,
+the guest cart joins theirs (quantities add up, to at most 10 per item).
+
+Prices are never stored in the cart, so it always shows the live price. Lines whose product
+was unpublished, or whose stock fell below the quantity, are marked unavailable and left out
+of the subtotal.
 
 ## Scripts
 

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module.js';
+import { CartModule } from './cart/cart.module.js';
 import { CatalogModule } from './catalog/catalog.module.js';
 import { OriginGuard } from './common/origin.guard.js';
 import { validateEnv } from './config/env.js';
@@ -19,6 +20,7 @@ import { UsersModule } from './users/users.module.js';
     PrismaModule,
     StorageModule,
     AuthModule,
+    CartModule,
     CatalogModule,
     HealthModule,
     MediaModule,
