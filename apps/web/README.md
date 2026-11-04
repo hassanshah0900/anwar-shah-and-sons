@@ -63,9 +63,12 @@ it, so session cookies stay first-party on the web origin.
   product page and the header's item count use the same Server Actions
   (`src/app/(store)/cart/actions.ts`).
 
-- **`/checkout`** (signed in): shipping address, cash on delivery and the order summary. Guests
+- **`/checkout`** (signed in): shipping address (the default saved address is filled in, others
+  can be picked, and a new one can be saved), cash on delivery and the order summary. Guests
   are sent to sign in first; their bag comes with them. The form sends back the total it
   showed, so the API refuses the order if prices changed.
+- **`/account`**: change name and password (other devices are signed out), with links to
+  orders and **`/account/addresses`**, the address book (add, edit, delete, choose a default).
 - **`/account/orders`** and **`/account/orders/<number>`**: order history and details. A new
   order opens with a thank-you note.
 
