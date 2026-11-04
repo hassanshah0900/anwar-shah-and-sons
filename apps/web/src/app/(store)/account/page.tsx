@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
+import { ChangePasswordForm } from '@/components/account/change-password-form';
+import { ProfileForm } from '@/components/account/profile-form';
 import { SignOutButton } from '@/components/account/sign-out-button';
 import { ADMIN_ROLE } from '@repo/shared';
 import { Badge } from '@/components/ui/badge';
@@ -28,31 +30,47 @@ async function AccountDetails() {
   const user = await requireUser('/account');
 
   return (
-    <section aria-labelledby="profile-heading" className="mt-10 max-w-xl">
-      <h2 id="profile-heading" className="text-2xl">
-        Profile
-      </h2>
-      <dl className="mt-4 divide-y border-y">
-        <Row label="Name">{user.name}</Row>
-        <Row label="Email">{user.email}</Row>
-        <Row label="Account type">
-          <Badge variant="outline" className="capitalize">
-            {user.role}
-          </Badge>
-        </Row>
-      </dl>
-      <div className="mt-8 flex flex-wrap gap-3">
+    <div className="mt-10 grid max-w-xl gap-12">
+      <nav aria-label="Account" className="flex flex-wrap gap-3">
         <Button variant="outline" asChild>
           <Link href="/account/orders">Your orders</Link>
+        </Button>
+        <Button variant="outline" asChild>
+          <Link href="/account/addresses">Your addresses</Link>
         </Button>
         {user.role === ADMIN_ROLE && (
           <Button asChild>
             <Link href="/admin">Go to admin</Link>
           </Button>
         )}
+      </nav>
+
+      <section aria-labelledby="profile-heading" className="grid gap-6">
+        <h2 id="profile-heading" className="text-2xl">
+          Profile
+        </h2>
+        <dl className="divide-y border-y">
+          <Row label="Email">{user.email}</Row>
+          <Row label="Account type">
+            <Badge variant="outline" className="capitalize">
+              {user.role}
+            </Badge>
+          </Row>
+        </dl>
+        <ProfileForm name={user.name} />
+      </section>
+
+      <section aria-labelledby="password-heading" className="grid gap-6">
+        <h2 id="password-heading" className="text-2xl">
+          Password
+        </h2>
+        <ChangePasswordForm />
+      </section>
+
+      <div className="border-t pt-8">
         <SignOutButton />
       </div>
-    </section>
+    </div>
   );
 }
 
