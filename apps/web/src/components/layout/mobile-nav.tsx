@@ -6,8 +6,9 @@ import { MenuIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { siteConfig } from '@/config/site';
+import type { NavLink } from '@/lib/catalog/nav';
 
-export function MobileNav() {
+export function MobileNav({ links }: { links: NavLink[] }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -23,7 +24,7 @@ export function MobileNav() {
         </SheetHeader>
         <nav aria-label="Mobile">
           <ul className="flex flex-col px-4">
-            {siteConfig.mainNav.map((item) => (
+            {links.map((item) => (
               <li key={item.href} className="border-b last:border-b-0">
                 <Link
                   href={item.href}

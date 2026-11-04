@@ -33,6 +33,19 @@ it, so session cookies stay first-party on the web origin.
 - **`src/proxy.ts`:** redirects visitors without a session cookie away from `/account`
   and `/admin` before rendering.
 
+## Shop
+
+- **`/`**: home page with categories and new arrivals. Its copy lives in `src/config/site.ts`.
+- **`/shop`** (all products, with `?q=` search) and **`/shop/<category>`** (includes
+  sub-categories): filters, sort and pagination.
+- **Navigation:** the header, mobile menu and footer list the top-level categories, so the
+  menus follow what admins create.
+
+The page's state lives in the URL (`option=size:m`, `min`, `max`, `sort`, `page`); see
+`src/lib/catalog/listing-params.ts`. Filters are plain links and a GET form, so they work
+without JavaScript and every view can be shared. Catalog data comes from the public API
+through `src/lib/api/catalog.ts`, without cookies.
+
 ## Admin
 
 `/admin` (admins only) has Customers, Products, Categories and Options. Products are
@@ -66,15 +79,16 @@ src/
   proxy.ts       redirects signed-out visitors from protected routes
   components/
     account/     account menu and sign-out
-    admin/       admin navigation, dialogs, swatches
+    admin/       admin navigation and dialogs
     auth/        sign-in and sign-up forms
     layout/      header, footer, mobile navigation
+    shop/        product card and grid, filters, sort, pagination
     ui/          shadcn/ui components, restyled to the design system
-  config/        site name and navigation
+  config/        site name, home page copy, footer links
   lib/
     api/         server-only API clients, validated with @repo/shared schemas
     auth/        session access, auth client, safe redirects
-    catalog/     category tree helpers
+    catalog/     category tree, shop URL state, shop navigation
     forms/       Server Action form state
     env.ts       server environment validation
     fonts.ts     next/font definitions

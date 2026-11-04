@@ -5,31 +5,27 @@ import { AccountMenu, SignInLink } from '@/components/account/account-menu';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { siteConfig } from '@/config/site';
+import { shopAllLink } from '@/lib/catalog/nav';
+import { MainNav, MainNavLinks, MobileNavWithCategories } from './main-nav';
 import { MobileNav } from './mobile-nav';
 
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b bg-background">
       <div className="page-container flex h-16 items-center gap-4">
-        <MobileNav />
+        {/* Category links stream in; until then the menus offer "Shop all". */}
+        <Suspense fallback={<MobileNav links={[shopAllLink]} />}>
+          <MobileNavWithCategories />
+        </Suspense>
 
         <Link href="/" className="font-heading text-2xl leading-none tracking-tight">
           {siteConfig.name}
         </Link>
 
         <nav aria-label="Main" className="ml-8 hidden md:block">
-          <ul className="flex items-center gap-6">
-            {siteConfig.mainNav.map((item) => (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  {item.title}
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <Suspense fallback={<MainNavLinks links={[shopAllLink]} />}>
+            <MainNav />
+          </Suspense>
         </nav>
 
         <div className="ml-auto flex items-center gap-1">

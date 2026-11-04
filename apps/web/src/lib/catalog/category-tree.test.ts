@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Category } from '@repo/shared';
-import { descendantIds, flattenCategoryTree } from './category-tree';
+import { ancestorsOf, descendantIds, flattenCategoryTree } from './category-tree';
 
 const category = (id: string, parentId: string | null, position = 0): Category => ({
   id,
@@ -31,5 +31,16 @@ describe('flattenCategoryTree', () => {
 describe('descendantIds', () => {
   it('collects a category and everything below it', () => {
     expect([...descendantIds(categories, 'men')].sort()).toEqual(['formal', 'men', 'shirts']);
+  });
+});
+
+describe('ancestorsOf', () => {
+  it('lists ancestors from the top level down', () => {
+    expect(ancestorsOf(categories, 'formal').map(({ id }) => id)).toEqual(['men', 'shirts']);
+  });
+
+  it('is empty for a top-level or unknown category', () => {
+    expect(ancestorsOf(categories, 'women')).toEqual([]);
+    expect(ancestorsOf(categories, 'missing')).toEqual([]);
   });
 });
