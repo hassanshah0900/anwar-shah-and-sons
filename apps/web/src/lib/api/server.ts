@@ -53,8 +53,10 @@ async function send(
   body: unknown,
   extraHeaders: Record<string, string> = {},
 ): Promise<Response> {
-  const { API_URL } = getServerEnv();
+  // Read the request first: during a build this defers the page to request time,
+  // so builds never need API_URL (or the API) to be available.
   const incoming = await headers();
+  const { API_URL } = getServerEnv();
 
   const outgoing = new Headers({ ...extraHeaders, cookie: incoming.get('cookie') ?? '' });
   const origin = incoming.get('origin');
