@@ -1,0 +1,260 @@
+import { INestApplication } from '@nestjs/common';
+import { orderListSchema, orderSchema, type CheckoutInput, type Order } from '@repo/shared';
+import request from 'supertest';
+import { App } from 'supertest/types.js';
+import { PrismaService } from '../src/prisma/prisma.service.js';
+import { createTestApp, WEB_ORIGIN } from './support/app.js';
+import { adminApi } from './support/catalog.js';
+import { resetCatalog } from './support/database.js';
+import { signUpAs } from './support/users.js';
+
+// vitest.config.e2e.ts sets shipping to 250, free from 10,000 (PKR has no minor unit).
+const SHIPPING = 250;
+
+describe('Checkout and orders (e2e)', () => {
+  let app: INestApplication<App>;
+  let prisma: PrismaService;
+  let admin: ReturnType<typeof adminApi>;
+  let productId: string;
+  /** small: 2,000 with 3 in stock; medium: 3,000 with 10 in stock. */
+  const variant: Record<string, string> = {};
+
+  const address = {
+    fullName: 'Ayesha Khan',
+    phone: '+92 300 1234567',
+    line1: '12 Mall Road',
+    city: 'Lahore',
+  };
+
+  const as = (cookies: string[]) => {
+    const call = (method: 'get' | 'post' | 'patch', path: string) =>
+      request(app.getHttpServer())
+        [method](`/api/v1${path}`)
+        .set('Cookie', cookies)
+        .set('Origin', WEB_ORIGIN);
+    return {
+      add: (variantId: string, quantity: number) =>
+        call('post', '/cart/items').send({ variantId, quantity }).expect(201),
+      checkout: (body: Partial<CheckoutInput>) =>
+        call('post', '/checkout').send({ address, ...body }),
+      get: (path: string) => call('get', path),
+    };
+  };
+
+  const stockOf = async (variantId: string) =>
+    (await prisma.productVariant.findUniqueOrThrow({ where: { id: variantId } })).stock;
+  const setStock = (variantId: string, stock: number) =>
+    admin.patch(`/products/${productId}/variants/${variantId}`, { stock }).expect(200);
+  const placed = (body: unknown): Order => orderSchema.parse(body);
+
+  beforeAll(async () => {
+    app = await createTestApp();
+    prisma = app.get(PrismaService);
+    await prisma.order.deleteMany();
+    await prisma.cart.deleteMany();
+    await resetCatalog(prisma);
+    await prisma.user.deleteMany();
+    admin = adminApi(app, await signUpAs(app, 'orders-admin@example.com', 'admin'));
+
+    const categoryId = (await admin.post('/categories', { name: 'Shirts' }).expect(201)).body.id;
+    const size = (await admin.post('/option-types', { name: 'Size', kind: 'text' }).expect(201))
+      .body;
+    const product = (
+      await admin
+        .post('/products', {
+          name: 'Oxford Shirt',
+          categoryId,
+          price: 2000,
+          optionTypeIds: [size.id],
+        })
+        .expect(201)
+    ).body;
+    productId = product.id;
+
+    for (const [key, label, stock, price] of [
+      ['small', 'S', 3, undefined],
+      ['medium', 'M', 10, 3000],
+    ] as const) {
+      const valueId = (await admin.post(`/option-types/${size.id}/values`, { label }).expect(201))
+        .body.id;
+      await admin
+        .post(`/products/${productId}/variants`, {
+          sku: `oxford-${label}`,
+          stock,
+          price,
+          optionValueIds: [valueId],
+        })
+        .expect(201);
+      variant[key] = (
+        await prisma.productVariant.findFirstOrThrow({
+          where: { productId, optionValues: { some: { optionValueId: valueId } } },
+        })
+      ).id;
+    }
+    await admin.patch(`/products/${productId}`, { status: 'active' }).expect(200);
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('needs a signed-in customer', async () => {
+    await request(app.getHttpServer())
+      .post('/api/v1/checkout')
+      .set('Origin', WEB_ORIGIN)
+      .send({ address, expectedTotal: 0 })
+      .expect(401);
+  });
+
+  it('refuses an empty bag', async () => {
+    const shopper = as(await signUpAs(app, 'empty@example.com'));
+    const response = await shopper.checkout({ expectedTotal: 0 }).expect(400);
+    expect(response.body.message).toBe('Your bag is empty');
+  });
+
+  it('validates the address', async () => {
+    const shopper = as(await signUpAs(app, 'typo@example.com'));
+    await shopper.add(variant.small!, 1);
+    await shopper
+      .checkout({ address: { ...address, phone: 'call me' }, expectedTotal: 2000 + SHIPPING })
+      .expect(400);
+  });
+
+  it('places an order: copies the lines, takes stock and empties the bag', async () => {
+    const shopper = as(await signUpAs(app, 'ayesha@example.com'));
+    await shopper.add(variant.small!, 2);
+
+    const order = placed(
+      (
+        await shopper
+          .checkout({ expectedTotal: 4000 + SHIPPING, notes: 'Ring the bell' })
+          .expect(201)
+      ).body,
+    );
+
+    expect(order).toMatchObject({
+      status: 'pending',
+      paymentMethod: 'cod',
+      email: 'ayesha@example.com',
+      currency: 'PKR',
+      subtotal: 4000,
+      shipping: SHIPPING,
+      total: 4000 + SHIPPING,
+      notes: 'Ring the bell',
+      address: { ...address, line2: null, postalCode: null },
+      items: [
+        {
+          productName: 'Oxford Shirt',
+          productSlug: 'oxford-shirt',
+          variantLabel: 'Size: S',
+          unitPrice: 2000,
+          quantity: 2,
+          lineTotal: 4000,
+        },
+      ],
+    });
+    expect(order.number).toBeGreaterThanOrEqual(1001);
+    expect(await stockOf(variant.small!)).toBe(1);
+    expect((await shopper.get('/cart').expect(200)).body.lines).toEqual([]);
+
+    // A later price change doesn't touch the order.
+    await admin.patch(`/products/${productId}`, { price: 2500 }).expect(200);
+    const again = placed((await shopper.get(`/orders/${order.number}`).expect(200)).body);
+    expect(again.items[0]!.unitPrice).toBe(2000);
+    await admin.patch(`/products/${productId}`, { price: 2000 }).expect(200);
+    await setStock(variant.small!, 3);
+  });
+
+  it('ships free at the threshold', async () => {
+    const shopper = as(await signUpAs(app, 'big-spender@example.com'));
+    await shopper.add(variant.medium!, 4);
+
+    const order = placed((await shopper.checkout({ expectedTotal: 12000 }).expect(201)).body);
+    expect(order).toMatchObject({ subtotal: 12000, shipping: 0, total: 12000 });
+    await setStock(variant.medium!, 10);
+  });
+
+  it('refuses a total the shopper didn’t see, changing nothing', async () => {
+    const shopper = as(await signUpAs(app, 'stale@example.com'));
+    await shopper.add(variant.small!, 1);
+
+    const response = await shopper.checkout({ expectedTotal: 1 }).expect(409);
+    expect(response.body.message).toBe('Prices have changed. Please review your bag.');
+    expect(await stockOf(variant.small!)).toBe(3);
+    expect((await shopper.get('/cart').expect(200)).body.itemCount).toBe(1);
+  });
+
+  it('refuses items that sold out after they were added', async () => {
+    const shopper = as(await signUpAs(app, 'late@example.com'));
+    await shopper.add(variant.small!, 2);
+    await shopper.add(variant.medium!, 1);
+    await setStock(variant.small!, 1);
+
+    await shopper.checkout({ expectedTotal: 4000 + 3000 + SHIPPING }).expect(409);
+    // The whole order failed, so the medium shirt was not taken either.
+    expect(await stockOf(variant.medium!)).toBe(10);
+    expect((await shopper.get('/cart').expect(200)).body.itemCount).toBe(3);
+    await setStock(variant.small!, 3);
+  });
+
+  it('refuses unpublished products', async () => {
+    const shopper = as(await signUpAs(app, 'draft@example.com'));
+    await shopper.add(variant.small!, 1);
+    await admin.patch(`/products/${productId}`, { status: 'draft' }).expect(200);
+    try {
+      await shopper.checkout({ expectedTotal: 2000 + SHIPPING }).expect(409);
+    } finally {
+      await admin.patch(`/products/${productId}`, { status: 'active' }).expect(200);
+    }
+  });
+
+  it('shows customers only their own orders', async () => {
+    const owner = as(await signUpAs(app, 'owner@example.com'));
+    await owner.add(variant.small!, 1);
+    const order = placed(
+      (await owner.checkout({ expectedTotal: 2000 + SHIPPING }).expect(201)).body,
+    );
+
+    const mine = orderListSchema.parse((await owner.get('/orders').expect(200)).body);
+    expect(mine.orders.map((summary) => summary.number)).toEqual([order.number]);
+    expect(mine.orders[0]).toMatchObject({ itemCount: 1, customerName: 'Ayesha Khan' });
+
+    const stranger = as(await signUpAs(app, 'stranger@example.com'));
+    await stranger.get(`/orders/${order.number}`).expect(404);
+    expect(orderListSchema.parse((await stranger.get('/orders').expect(200)).body).total).toBe(0);
+    await stranger.get('/admin/orders').expect(403);
+    await owner.get('/orders/not-a-number').expect(400);
+  });
+
+  it('lets admins list orders and move them through their statuses', async () => {
+    await setStock(variant.small!, 3);
+    const shopper = as(await signUpAs(app, 'status@example.com'));
+    await shopper.add(variant.small!, 2);
+    const { number } = placed(
+      (await shopper.checkout({ expectedTotal: 4000 + SHIPPING }).expect(201)).body,
+    );
+    expect(await stockOf(variant.small!)).toBe(1);
+
+    const pending = orderListSchema.parse(
+      (await admin.get('/orders?status=pending').expect(200)).body,
+    );
+    expect(pending.orders.map((summary) => summary.number)).toContain(number);
+    expect(pending.orders.every((summary) => summary.status === 'pending')).toBe(true);
+
+    const skip = await admin.patch(`/orders/${number}`, { status: 'shipped' }).expect(409);
+    expect(skip.body.message).toBe("A pending order can't be marked shipped");
+
+    await admin.patch(`/orders/${number}`, { status: 'confirmed' }).expect(200);
+    const cancelled = placed(
+      (await admin.patch(`/orders/${number}`, { status: 'cancelled' }).expect(200)).body,
+    );
+    expect(cancelled.status).toBe('cancelled');
+    // Cancelling returns the items to stock, once.
+    expect(await stockOf(variant.small!)).toBe(3);
+    await admin.patch(`/orders/${number}`, { status: 'cancelled' }).expect(200);
+    expect(await stockOf(variant.small!)).toBe(3);
+    await admin.patch(`/orders/${number}`, { status: 'confirmed' }).expect(409);
+
+    await admin.get('/orders/999999').expect(404);
+  });
+});
