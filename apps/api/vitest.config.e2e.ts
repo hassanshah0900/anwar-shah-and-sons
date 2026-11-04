@@ -31,6 +31,8 @@ export default defineConfig({
       DATABASE_URL: e2eDatabaseUrl.toString(),
       BETTER_AUTH_SECRET: 'e2e-secret-that-is-at-least-32-characters',
       BETTER_AUTH_URL: 'http://localhost:3000',
+      SHIPPING_FLAT_RATE: '250',
+      FREE_SHIPPING_OVER: '10000',
       STORAGE_DRIVER: 'local',
       STORAGE_LOCAL_DIR: join(tmpdir(), 'anwar-shah-and-sons-e2e-uploads'),
     },

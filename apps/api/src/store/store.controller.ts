@@ -1,6 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { StoreConfig } from '@repo/shared';
+import { toMinorUnits, type StoreConfig } from '@repo/shared';
 import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import type { Env } from '../config/env.js';
 
@@ -12,9 +12,20 @@ export class StoreController {
   /** Store-wide settings the storefront needs, such as how to format prices. */
   @Get()
   get(): StoreConfig {
-    return {
-      currency: this.config.get('STORE_CURRENCY', { infer: true }),
-      locale: this.config.get('STORE_LOCALE', { infer: true }),
-    };
+    return storeConfig(this.config);
   }
+}
+
+/** The store settings from the environment, with amounts in minor units. */
+export function storeConfig(config: ConfigService<Env, true>): StoreConfig {
+  const currency = config.get('STORE_CURRENCY', { infer: true });
+  const freeOver = config.get('FREE_SHIPPING_OVER', { infer: true });
+  return {
+    currency,
+    locale: config.get('STORE_LOCALE', { infer: true }),
+    shipping: {
+      flatRate: toMinorUnits(config.get('SHIPPING_FLAT_RATE', { infer: true }), currency),
+      freeOver: freeOver === undefined ? null : toMinorUnits(freeOver, currency),
+    },
+  };
 }

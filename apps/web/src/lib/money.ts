@@ -1,7 +1,10 @@
 import { currencyExponent, formatMoney, toMinorUnits, type StoreConfig } from '@repo/shared';
 
 /** Formats an amount in minor units for the store, e.g. 4990 -> "Rs 4,990". */
-export function formatPrice(minor: number, store: StoreConfig): string {
+export function formatPrice(
+  minor: number,
+  store: Pick<StoreConfig, 'currency' | 'locale'>,
+): string {
   return formatMoney(minor, store.currency, store.locale);
 }
 
