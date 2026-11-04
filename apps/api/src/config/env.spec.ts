@@ -15,9 +15,17 @@ describe('validateEnv', () => {
       PORT: 4000,
       STORE_CURRENCY: 'PKR',
       STORE_LOCALE: 'en-PK',
+      SHIPPING_FLAT_RATE: 0,
       STORAGE_DRIVER: 'local',
       STORAGE_LOCAL_DIR: 'uploads',
     });
+  });
+
+  it('reads shipping amounts, treating a blank free-shipping threshold as none', () => {
+    const env = validateEnv({ ...validEnv, SHIPPING_FLAT_RATE: '250', FREE_SHIPPING_OVER: '' });
+    expect(env.SHIPPING_FLAT_RATE).toBe(250);
+    expect(env.FREE_SHIPPING_OVER).toBeUndefined();
+    expect(validateEnv({ ...validEnv, FREE_SHIPPING_OVER: '5000' }).FREE_SHIPPING_OVER).toBe(5000);
   });
 
   it('coerces PORT to a number', () => {

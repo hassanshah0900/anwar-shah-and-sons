@@ -18,6 +18,13 @@ export const envSchema = z.object({
     .default('PKR'),
   /** BCP 47 locale for formatting prices and dates. */
   STORE_LOCALE: z.string().refine(isSupportedLocale, 'Use a locale such as en-PK').default('en-PK'),
+  /** Shipping charged per order, in major units of STORE_CURRENCY (e.g. 250 for Rs 250). */
+  SHIPPING_FLAT_RATE: z.coerce.number().nonnegative().default(0),
+  /** Orders at or above this subtotal (major units) ship free. Leave unset for no offer. */
+  FREE_SHIPPING_OVER: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.coerce.number().nonnegative().optional(),
+  ),
   /** Where uploaded media is stored: a local directory or an S3 bucket. */
   STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
   /** Directory for the local driver, relative to the API's working directory. */

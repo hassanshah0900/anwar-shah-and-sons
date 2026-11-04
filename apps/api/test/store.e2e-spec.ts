@@ -15,9 +15,13 @@ describe('GET /api/v1/store (e2e)', () => {
     await app.close();
   });
 
-  it('is public and returns the store currency and locale', async () => {
+  it('is public and returns the store currency, locale and shipping', async () => {
     const response = await request(app.getHttpServer()).get('/api/v1/store').expect(200);
 
-    expect(storeConfigSchema.parse(response.body)).toEqual({ currency: 'PKR', locale: 'en-PK' });
+    expect(storeConfigSchema.parse(response.body)).toMatchObject({
+      currency: 'PKR',
+      locale: 'en-PK',
+      shipping: { flatRate: 250, freeOver: 10000 },
+    });
   });
 });

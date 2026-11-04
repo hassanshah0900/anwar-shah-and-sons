@@ -3,6 +3,7 @@ export * from './cart.js';
 export * from './catalog.js';
 export * from './health.js';
 export * from './money.js';
+export * from './orders.js';
 export * from './products.js';
 export * from './slug.js';
 export * from './store.js';
