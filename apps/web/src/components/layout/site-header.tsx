@@ -1,9 +1,8 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
-import { ShoppingBagIcon } from 'lucide-react';
 import { AccountMenu, SignInLink } from '@/components/account/account-menu';
+import { CartButton, CartLink } from '@/components/cart/cart-button';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { Button } from '@/components/ui/button';
 import { siteConfig } from '@/config/site';
 import { shopAllLink } from '@/lib/catalog/nav';
 import { MainNav, MainNavLinks, MobileNavWithCategories } from './main-nav';
@@ -34,11 +33,9 @@ export function SiteHeader() {
           <Suspense fallback={<SignInLink />}>
             <AccountMenu />
           </Suspense>
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/cart" aria-label="Shopping bag">
-              <ShoppingBagIcon />
-            </Link>
-          </Button>
+          <Suspense fallback={<CartLink />}>
+            <CartButton />
+          </Suspense>
         </div>
       </div>
     </header>

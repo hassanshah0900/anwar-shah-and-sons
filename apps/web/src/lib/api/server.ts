@@ -21,6 +21,8 @@ type ApiRequest = {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   /** JSON-serialisable data, or FormData for multipart uploads. */
   body?: unknown;
+  /** Extra request headers, such as the guest cart token. */
+  headers?: Record<string, string>;
 };
 
 /**
@@ -31,22 +33,30 @@ type ApiRequest = {
 export async function apiRequest<T extends z.ZodType>(
   path: string,
   schema: T,
-  { method = 'GET', body }: ApiRequest = {},
+  { method = 'GET', body, headers }: ApiRequest = {},
 ): Promise<z.output<T>> {
-  const response = await send(path, method, body);
+  const response = await send(path, method, body, headers);
   return schema.parse(await response.json());
 }
 
 /** Like apiRequest, for endpoints that answer 204 No Content. */
-export async function apiCommand(path: string, { method = 'POST', body }: ApiRequest = {}) {
-  await send(path, method, body);
+export async function apiCommand(
+  path: string,
+  { method = 'POST', body, headers }: ApiRequest = {},
+) {
+  await send(path, method, body, headers);
 }
 
-async function send(path: string, method: string, body: unknown): Promise<Response> {
+async function send(
+  path: string,
+  method: string,
+  body: unknown,
+  extraHeaders: Record<string, string> = {},
+): Promise<Response> {
   const { API_URL } = getServerEnv();
   const incoming = await headers();
 
-  const outgoing = new Headers({ cookie: incoming.get('cookie') ?? '' });
+  const outgoing = new Headers({ ...extraHeaders, cookie: incoming.get('cookie') ?? '' });
   const origin = incoming.get('origin');
   if (method !== 'GET' && origin) outgoing.set('origin', origin);
   // FormData (file uploads) sets its own multipart content type and boundary.

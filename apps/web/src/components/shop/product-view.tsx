@@ -11,10 +11,17 @@ import {
   valueState,
   type Selection,
 } from '@/lib/catalog/variant-selection';
+import { AddToBag } from '@/components/cart/add-to-bag';
 import { formatPrice } from '@/lib/money';
 import { cn } from '@/lib/utils';
 import { OptionPicker } from './option-picker';
 import { ProductGallery } from './product-gallery';
+
+const stockDot: Record<StockLevel, string> = {
+  in_stock: 'bg-foreground',
+  low_stock: 'bg-muted-foreground',
+  out_of_stock: 'bg-destructive',
+};
 
 const stockText: Record<StockLevel, string> = {
   in_stock: 'In stock',
@@ -79,29 +86,26 @@ export function ProductView({
           />
         ))}
 
-        <p
-          aria-live="polite"
-          className={cn(
-            'flex items-center gap-2 text-sm',
-            variant?.stockLevel === 'out_of_stock' ? 'text-destructive' : 'text-muted-foreground',
-          )}
-        >
-          {variant ? (
-            <>
+        <div className="flex flex-col gap-3">
+          <AddToBag variant={variant} missing={missing.map((option) => option.name)} />
+          {variant && (
+            <p
+              aria-live="polite"
+              className={cn(
+                'flex items-center gap-2 text-sm',
+                variant.stockLevel === 'out_of_stock'
+                  ? 'text-destructive'
+                  : 'text-muted-foreground',
+              )}
+            >
               <span
                 aria-hidden
-                className={cn(
-                  'size-2 rounded-full',
-                  variant.stockLevel === 'out_of_stock' ? 'bg-destructive' : 'bg-foreground',
-                  variant.stockLevel === 'low_stock' && 'bg-muted-foreground',
-                )}
+                className={cn('size-2 rounded-full', stockDot[variant.stockLevel])}
               />
               {stockText[variant.stockLevel]}
-            </>
-          ) : (
-            `Select ${missing.map((option) => option.name.toLowerCase()).join(' and ')}`
+            </p>
           )}
-        </p>
+        </div>
 
         {children}
       </div>
