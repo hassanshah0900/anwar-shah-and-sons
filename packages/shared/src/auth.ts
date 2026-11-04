@@ -46,6 +46,21 @@ export const resetPasswordSchema = z
   });
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
+export const profileSchema = z.object({ name: signUpSchema.shape.name });
+export type ProfileInput = z.infer<typeof profileSchema>;
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Enter your current password'),
+    newPassword: passwordSchema,
+    confirmPassword: z.string(),
+  })
+  .refine((input) => input.newPassword === input.confirmPassword, {
+    path: ['confirmPassword'],
+    message: "The passwords don't match",
+  });
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
 /** The signed-in user as exposed to clients (no ban or internal fields). */
 export const sessionUserSchema = z.object({
   id: z.string(),
