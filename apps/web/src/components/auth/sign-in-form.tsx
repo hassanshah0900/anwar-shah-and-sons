@@ -57,13 +57,21 @@ export function SignInForm() {
         autoComplete="email"
         error={fieldErrors.email}
       />
-      <FormField
-        name="password"
-        label="Password"
-        type="password"
-        autoComplete="current-password"
-        error={fieldErrors.password}
-      />
+      <div className="grid gap-2">
+        <FormField
+          name="password"
+          label="Password"
+          type="password"
+          autoComplete="current-password"
+          error={fieldErrors.password}
+        />
+        <Link
+          href="/forgot-password"
+          className="justify-self-start text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+        >
+          Forgot password?
+        </Link>
+      </div>
       <Button type="submit" size="lg" disabled={pending}>
         {pending ? 'Signing in…' : 'Sign in'}
       </Button>
