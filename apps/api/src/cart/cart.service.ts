@@ -2,59 +2,18 @@ import { createHash, randomBytes } from 'node:crypto';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   MAX_LINE_QUANTITY,
-  stockLevel,
   type AddToCart,
   type Cart,
-  type CartLine,
   type CartMutation,
   type UpdateCartLine,
 } from '@repo/shared';
-import type { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { lineSelect, toLine } from './cart-line.js';
 
 /** Who is shopping: a signed-in customer, a guest holding a cart token, or both. */
 export type CartOwner = { userId?: string; token?: string };
 
 type ResolvedCart = { cartId: string; token: string | null };
-
-const lineSelect = {
-  quantity: true,
-  variant: {
-    select: {
-      id: true,
-      price: true,
-      stock: true,
-      product: {
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          price: true,
-          status: true,
-          options: { select: { optionTypeId: true }, orderBy: { position: 'asc' } },
-          images: {
-            select: { storageKey: true, alt: true, optionValueId: true },
-            orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
-          },
-        },
-      },
-      optionValues: {
-        select: {
-          optionValue: {
-            select: {
-              id: true,
-              label: true,
-              optionTypeId: true,
-              optionType: { select: { name: true } },
-            },
-          },
-        },
-      },
-    },
-  },
-} satisfies Prisma.CartItemSelect;
-
-type LineRow = Prisma.CartItemGetPayload<{ select: typeof lineSelect }>;
 
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
 
@@ -223,33 +182,4 @@ function assertQuantity(quantity: number, stock: number): void {
   }
   if (stock <= 0) throw new ConflictException('This item is out of stock');
   if (quantity > stock) throw new ConflictException('Not enough stock for that quantity');
-}
-
-function toLine({ quantity, variant }: LineRow): CartLine {
-  const { product } = variant;
-  const typeOrder = product.options.map((option) => option.optionTypeId);
-  const values = variant.optionValues
-    .map(({ optionValue }) => optionValue)
-    .sort((a, b) => typeOrder.indexOf(a.optionTypeId) - typeOrder.indexOf(b.optionTypeId));
-  const valueIds = new Set(values.map((value) => value.id));
-  // Prefer a photo of this variant (e.g. its colour), else the product's first.
-  const image =
-    product.images.find(
-      (candidate) => candidate.optionValueId && valueIds.has(candidate.optionValueId),
-    ) ?? product.images[0];
-  const unitPrice = variant.price ?? product.price;
-
-  return {
-    variantId: variant.id,
-    productId: product.id,
-    name: product.name,
-    slug: product.slug,
-    image: image ? { key: image.storageKey, alt: image.alt } : null,
-    options: values.map((value) => ({ name: value.optionType.name, value: value.label })),
-    unitPrice,
-    quantity,
-    lineTotal: unitPrice * quantity,
-    stockLevel: stockLevel(variant.stock),
-    available: product.status === 'active' && variant.stock >= quantity,
-  };
 }
