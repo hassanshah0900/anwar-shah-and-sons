@@ -1,3 +1,4 @@
+export * from './addresses.js';
 export * from './auth.js';
 export * from './cart.js';
 export * from './catalog.js';
