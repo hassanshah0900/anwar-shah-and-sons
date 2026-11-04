@@ -96,7 +96,10 @@ through `src/lib/api/catalog.ts`, without cookies.
 
 ## Admin
 
-`/admin` (admins only) has Orders, Customers, Products, Categories and Options. Orders can be
+`/admin` (admins only) opens on a dashboard: today's and 30-day revenue and orders, a daily
+revenue chart (hover or focus a column for its figures; also available as a table), orders
+to confirm or ship, low stock and recent orders. Then Orders, Customers, Products,
+Categories and Options. Orders can be
 filtered by status and moved to their next status (confirm, ship, deliver); cancelling asks
 first and returns the items to stock. Products are
 created as drafts, get variants (generated from their options or added one by one) and can
