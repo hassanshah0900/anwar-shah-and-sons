@@ -35,6 +35,17 @@ export const signUpSchema = z.object({
 });
 export type SignUpInput = z.infer<typeof signUpSchema>;
 
+export const forgotPasswordSchema = z.object({ email: emailSchema });
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+
+export const resetPasswordSchema = z
+  .object({ password: passwordSchema, confirmPassword: z.string() })
+  .refine((input) => input.password === input.confirmPassword, {
+    path: ['confirmPassword'],
+    message: "The passwords don't match",
+  });
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
 /** The signed-in user as exposed to clients (no ban or internal fields). */
 export const sessionUserSchema = z.object({
   id: z.string(),
