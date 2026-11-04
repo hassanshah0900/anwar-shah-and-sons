@@ -29,7 +29,10 @@ it, so session cookies stay first-party on the web origin.
 
 - **Server:** `src/lib/auth/session.ts` (`getSessionUser`, `requireUser`, `requireAdmin`).
   Render anything that reads the session inside `<Suspense>`.
-- **Browser:** `src/lib/auth/client.ts` (sign-in, sign-up, sign-out).
+- **Browser:** `src/lib/auth/client.ts` (sign-in, sign-up, sign-out, password reset).
+- **Password reset:** `/forgot-password` asks the API to email a link, with the same answer
+  whether or not the address has an account. The link opens `/reset-password?token=…`, which
+  sets the new password; expired or used links offer a new one.
 - **`src/proxy.ts`:** redirects visitors without a session cookie away from `/account`,
   `/checkout` and `/admin` before rendering.
 - After signing in or up, the forms do a full page load, so the browser can't reuse a
