@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { optionTypeListSchema, type OptionType } from '@repo/shared';
 import { ConfirmDeleteDialog } from '@/components/admin/confirm-delete-dialog';
-import { Swatch } from '@/components/admin/swatch';
+import { Swatch } from '@/components/shop/swatch';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiRequest } from '@/lib/api/server';

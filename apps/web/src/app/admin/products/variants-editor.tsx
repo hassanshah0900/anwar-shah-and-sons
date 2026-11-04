@@ -3,7 +3,7 @@
 import { useActionState } from 'react';
 import type { OptionType, Product, StoreConfig, Variant } from '@repo/shared';
 import { ConfirmDeleteDialog } from '@/components/admin/confirm-delete-dialog';
-import { Swatch } from '@/components/admin/swatch';
+import { Swatch } from '@/components/shop/swatch';
 import { FormError } from '@/components/forms/form-error';
 import { FormField } from '@/components/forms/form-field';
 import { Button } from '@/components/ui/button';
