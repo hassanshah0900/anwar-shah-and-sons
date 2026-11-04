@@ -52,6 +52,7 @@ role). See [ADR 0007](../../docs/adr/0007-media-storage.md).
 | `POST /api/v1/checkout`                       | Place an order from the signed-in customer's cart (`address`, `expectedTotal`, `notes`)                               |
 | `GET /api/v1/orders`                          | The customer's orders (`status`, `page`)                                                                              |
 | `GET /api/v1/orders/:number`                  | One of the customer's orders                                                                                          |
+| `/api/v1/addresses`                           | The customer's address book: list, add, `PATCH` (fields sent only), delete; one default, up to 10                     |
 | `/api/v1/admin/orders`                        | All orders: list (`status`, `page`), get, `PATCH { status }` (admin)                                                  |
 | `/api/v1/admin/categories`                    | Category tree: list, create, update, delete (admin)                                                                   |
 | `/api/v1/admin/option-types`                  | Product options and their values (admin)                                                                              |
@@ -78,7 +79,8 @@ of the subtotal.
 
 ## Orders
 
-Checkout needs a signed-in customer and pays cash on delivery. In one transaction it checks
+Checkout needs a signed-in customer and pays cash on delivery. With `saveAddress: true` the
+address is also added to the customer's address book, unless it's already there. In one transaction it checks
 that every line is still available, compares the total with `expectedTotal` (the amount the
 shopper saw; a mismatch is refused), takes stock with a conditional update so it can't go
 below zero, creates the order and empties the cart. If any step fails, nothing changes.
