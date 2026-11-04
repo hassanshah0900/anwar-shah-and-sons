@@ -33,6 +33,9 @@ export function AccountMenuDropdown({ user }: { user: SessionUser }) {
         <DropdownMenuItem asChild>
           <Link href="/account">Account</Link>
         </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/account/orders">Orders</Link>
+        </DropdownMenuItem>
         {user.role === ADMIN_ROLE && (
           <DropdownMenuItem asChild>
             <Link href="/admin">Admin</Link>

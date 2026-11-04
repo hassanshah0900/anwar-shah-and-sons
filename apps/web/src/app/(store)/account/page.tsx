@@ -42,6 +42,9 @@ async function AccountDetails() {
         </Row>
       </dl>
       <div className="mt-8 flex flex-wrap gap-3">
+        <Button variant="outline" asChild>
+          <Link href="/account/orders">Your orders</Link>
+        </Button>
         {user.role === ADMIN_ROLE && (
           <Button asChild>
             <Link href="/admin">Go to admin</Link>
