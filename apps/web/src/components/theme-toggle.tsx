@@ -41,3 +41,26 @@ export function ThemeToggle() {
     </DropdownMenu>
   );
 }
+
+/** The theme choice as a row of buttons, for menus where a dropdown would be awkward. */
+export function ThemeSwitcher() {
+  const { theme, setTheme } = useTheme();
+
+  return (
+    <div role="radiogroup" aria-label="Theme" className="flex gap-1 rounded-md border p-1">
+      {themes.map(({ value, label, icon: Icon }) => (
+        <button
+          key={value}
+          type="button"
+          role="radio"
+          aria-checked={theme === value}
+          onClick={() => setTheme(value)}
+          className="flex flex-1 items-center justify-center gap-2 rounded-sm px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground aria-checked:bg-muted aria-checked:text-foreground"
+        >
+          <Icon className="size-4" aria-hidden />
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
