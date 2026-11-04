@@ -7,6 +7,7 @@ import { CartModule } from './cart/cart.module.js';
 import { CatalogModule } from './catalog/catalog.module.js';
 import { OriginGuard } from './common/origin.guard.js';
 import { validateEnv } from './config/env.js';
+import { DashboardModule } from './dashboard/dashboard.module.js';
 import { HealthModule } from './health/health.module.js';
 import { MailModule } from './mail/mail.module.js';
 import { MediaModule } from './media/media.module.js';
@@ -27,6 +28,7 @@ import { UsersModule } from './users/users.module.js';
     AddressesModule,
     CartModule,
     CatalogModule,
+    DashboardModule,
     HealthModule,
     MediaModule,
     OrdersModule,
