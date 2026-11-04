@@ -23,6 +23,8 @@ export const envSchema = z.object({
     .string()
     .refine(isSupportedTimeZone, 'Use an IANA time zone such as Asia/Karachi')
     .default('Asia/Karachi'),
+  /** Guest carts untouched for this many days are deleted by a daily job. */
+  GUEST_CART_TTL_DAYS: z.coerce.number().int().positive().default(60),
   /** Shipping charged per order, in major units of STORE_CURRENCY (e.g. 250 for Rs 250). */
   SHIPPING_FLAT_RATE: z.coerce.number().nonnegative().default(0),
   /** Orders at or above this subtotal (major units) ship free. Leave unset for no offer. */

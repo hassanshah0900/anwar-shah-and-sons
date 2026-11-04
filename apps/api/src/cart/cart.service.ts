@@ -151,6 +151,17 @@ export class CartService {
     });
   }
 
+  /**
+   * Deletes guest carts (and their items) not changed since `cutoff`. Customer
+   * carts are never removed. Safe to run more than once, or on several servers.
+   */
+  async deleteStaleGuestCarts(cutoff: Date): Promise<number> {
+    const { count } = await this.prisma.cart.deleteMany({
+      where: { userId: null, updatedAt: { lt: cutoff } },
+    });
+    return count;
+  }
+
   /** Records activity, so abandoned guest carts can be found and cleared later. */
   private async touch(cartId: string): Promise<void> {
     await this.prisma.cart.update({ where: { id: cartId }, data: { updatedAt: new Date() } });
