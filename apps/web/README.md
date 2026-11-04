@@ -43,6 +43,12 @@ it, so session cookies stay first-party on the web origin.
 - **`/`**: home page with categories and new arrivals. Its copy lives in `src/config/site.ts`.
 - **`/shop`** (all products, with `?q=` search) and **`/shop/<category>`** (includes
   sub-categories): filters, sort and pagination.
+- **Search:** the header's search button opens a bar that searches `/shop?q=`.
+- **Help and company pages:** `/contact`, `/shipping`, `/returns`, `/about`. Their wording and
+  the store's contact details are in `src/config/content.ts`; shipping charges come from the
+  store settings, so the page always matches checkout.
+- **Errors:** `(store)/error.tsx` and `admin/error.tsx` show a retry page inside the normal
+  layout; `global-error.tsx` covers failures of the root layout.
 - **Navigation:** the header, mobile menu and footer list the top-level categories, so the
   menus follow what admins create.
 
@@ -113,7 +119,7 @@ src/
     layout/      header, footer, mobile navigation
     shop/        product card and grid, filters, sort, pagination, product page
     ui/          shadcn/ui components, restyled to the design system
-  config/        site name, home page copy, footer links
+  config/        site name, home page copy, footer links, help page content
   lib/
     api/         server-only API clients, validated with @repo/shared schemas
     auth/        session access, auth client, safe redirects
