@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { AddressesModule } from './addresses/addresses.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { CartModule } from './cart/cart.module.js';
 import { CatalogModule } from './catalog/catalog.module.js';
@@ -23,6 +24,7 @@ import { UsersModule } from './users/users.module.js';
     StorageModule,
     MailModule,
     AuthModule,
+    AddressesModule,
     CartModule,
     CatalogModule,
     HealthModule,

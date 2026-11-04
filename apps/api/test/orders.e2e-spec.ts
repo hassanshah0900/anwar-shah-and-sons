@@ -299,4 +299,25 @@ describe('Checkout and orders (e2e)', () => {
       `Order #${second.number} was cancelled`,
     ]);
   });
+
+  it('saves the address to the book when asked, once', async () => {
+    await setStock(variant.small!, 3);
+    const cookies = await signUpAs(app, 'saver@example.com');
+    const shopper = as(cookies);
+    const book = () =>
+      request(app.getHttpServer()).get('/api/v1/addresses').set('Cookie', cookies).expect(200);
+
+    await shopper.add(variant.small!, 1);
+    await shopper.checkout({ expectedTotal: 2000 + SHIPPING }).expect(201);
+    expect((await book()).body.addresses).toEqual([]);
+
+    for (let order = 0; order < 2; order++) {
+      await shopper.add(variant.small!, 1);
+      await shopper.checkout({ expectedTotal: 2000 + SHIPPING, saveAddress: true }).expect(201);
+    }
+    // The same address used twice is saved once, as the default.
+    expect((await book()).body.addresses).toEqual([
+      expect.objectContaining({ line1: address.line1, isDefault: true }),
+    ]);
+  });
 });

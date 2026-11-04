@@ -49,6 +49,8 @@ export const checkoutSchema = z.object({
   address: shippingAddressSchema,
   paymentMethod: paymentMethodSchema.default('cod'),
   notes: optionalText(500),
+  /** Also save the address to the customer's address book (skipped if it's already there). */
+  saveAddress: z.boolean().default(false),
   /**
    * The total the shopper saw. If prices changed since, the order is refused
    * rather than charging a different amount.

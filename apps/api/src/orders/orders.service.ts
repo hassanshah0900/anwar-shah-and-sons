@@ -15,6 +15,7 @@ import {
   type OrderListQuery,
   type OrderStatus,
 } from '@repo/shared';
+import { AddressesService } from '../addresses/addresses.service.js';
 import { lineSelect, toLine } from '../cart/cart-line.js';
 import type { Env } from '../config/env.js';
 import type { Prisma } from '../generated/prisma/client.js';
@@ -86,6 +87,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService<Env, true>,
     private readonly mailer: Mailer,
+    private readonly addresses: AddressesService,
   ) {}
 
   /**
@@ -169,8 +171,15 @@ export class OrdersService {
       return toOrder(order);
     });
 
-    // Only once the order is committed; a mail failure never undoes it.
+    // Only once the order is committed; neither of these can undo it.
     this.notify(order, orderPlacedEmail);
+    if (input.saveAddress) {
+      await this.addresses
+        .saveFromCheckout(customer.id, input.address)
+        .catch((error: unknown) =>
+          this.logger.error(`Saving the address from order #${order.number} failed`, error),
+        );
+    }
     return order;
   }
 
