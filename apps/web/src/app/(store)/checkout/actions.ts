@@ -3,6 +3,7 @@
 import { refresh } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { checkoutSchema } from '@repo/shared';
+import { readAddress } from '@/components/account/address-fields';
 import { placeOrder } from '@/lib/api/orders';
 import { requireUser } from '@/lib/auth/session';
 import type { ActionState } from '@/lib/forms/action-state';
@@ -20,15 +21,9 @@ export async function placeOrderAction(
     return typeof value === 'string' ? value : undefined;
   };
   const parsed = checkoutSchema.safeParse({
-    address: {
-      fullName: text('address.fullName'),
-      phone: text('address.phone'),
-      line1: text('address.line1'),
-      line2: text('address.line2'),
-      city: text('address.city'),
-      postalCode: text('address.postalCode'),
-    },
+    address: readAddress(formData, 'address.'),
     paymentMethod: text('paymentMethod'),
+    saveAddress: formData.get('saveAddress') === 'on',
     notes: text('notes'),
     expectedTotal: Number(text('expectedTotal')),
   });
