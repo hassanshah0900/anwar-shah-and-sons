@@ -1,5 +1,7 @@
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { siteConfig } from '@/config/site';
+import { getShopNav, shopAllLink, type NavLink } from '@/lib/catalog/nav';
 
 export function SiteFooter() {
   return (
@@ -10,24 +12,11 @@ export function SiteFooter() {
           <p className="mt-3 max-w-xs text-sm text-muted-foreground">{siteConfig.description}</p>
         </div>
 
+        <Suspense fallback={<FooterSection title="Shop" links={[shopAllLink]} />}>
+          <ShopSection />
+        </Suspense>
         {siteConfig.footerNav.map((section) => (
-          <div key={section.title}>
-            <h3 className="text-xs font-medium tracking-widest text-muted-foreground uppercase">
-              {section.title}
-            </h3>
-            <ul className="mt-4 space-y-3">
-              {section.links.map((link) => (
-                <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    className="text-sm transition-colors hover:text-muted-foreground"
-                  >
-                    {link.title}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <FooterSection key={section.title} title={section.title} links={section.links} />
         ))}
       </div>
 
@@ -37,5 +26,31 @@ export function SiteFooter() {
         </p>
       </div>
     </footer>
+  );
+}
+
+async function ShopSection() {
+  return <FooterSection title="Shop" links={await getShopNav()} />;
+}
+
+function FooterSection({ title, links }: { title: string; links: readonly NavLink[] }) {
+  return (
+    <div>
+      <h3 className="text-xs font-medium tracking-widest text-muted-foreground uppercase">
+        {title}
+      </h3>
+      <ul className="mt-4 space-y-3">
+        {links.map((link) => (
+          <li key={link.href}>
+            <Link
+              href={link.href}
+              className="text-sm transition-colors hover:text-muted-foreground"
+            >
+              {link.title}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
