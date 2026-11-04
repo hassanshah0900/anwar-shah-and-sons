@@ -1,0 +1,366 @@
+/**
+ * Fills the store with demo data so it looks lived in: categories, products
+ * with generated photos, sizes, colours and stock, customers with addresses,
+ * and two months of orders for the dashboard.
+ *
+ *   npm run db:seed:demo -w api
+ *
+ * Additive and repeatable: anything that already exists (matched by slug or
+ * email) is left alone, and nothing is deleted. Refuses to run with
+ * NODE_ENV=production unless --force is passed.
+ */
+import 'dotenv/config';
+import { randomUUID } from 'node:crypto';
+import { shippingFor, toMinorUnits } from '@repo/shared';
+import { createAuth } from '../src/auth/auth.js';
+import { validateEnv, type Env } from '../src/config/env.js';
+import { PrismaClient } from '../src/generated/prisma/client.js';
+import { createPrismaAdapter } from '../src/prisma/prisma-adapter.js';
+import { LocalStorageService } from '../src/storage/local-storage.service.js';
+import { S3StorageService } from '../src/storage/s3-storage.service.js';
+import type { StorageService } from '../src/storage/storage.js';
+import {
+  adultSizes,
+  categories,
+  colours,
+  customers,
+  DEMO_EMAIL_DOMAIN,
+  DEMO_PASSWORD,
+  kidsSizes,
+  products,
+} from './demo/catalog.js';
+import { garmentImage } from './demo/images.js';
+
+const DAY = 86_400_000;
+const ORDER_COUNT = 60;
+const ORDER_DAYS = 60;
+
+/** A small seeded random number generator, so every run makes the same data. */
+function random(seed: number) {
+  let state = seed;
+  const next = () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4_294_967_296;
+  };
+  return {
+    next,
+    int: (min: number, max: number) => min + Math.floor(next() * (max - min + 1)),
+    pick: <T>(items: readonly T[]) => items[Math.floor(next() * items.length)]!,
+  };
+}
+
+const slugify = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+
+function storageFor(env: Env): StorageService {
+  return env.STORAGE_DRIVER === 's3'
+    ? new S3StorageService({
+        bucket: env.S3_BUCKET ?? '',
+        region: env.S3_REGION ?? '',
+        endpoint: env.S3_ENDPOINT,
+      })
+    : new LocalStorageService(env.STORAGE_LOCAL_DIR);
+}
+
+async function main() {
+  const env = validateEnv(process.env);
+  if (env.NODE_ENV === 'production' && !process.argv.includes('--force')) {
+    throw new Error(
+      'Refusing to add demo data with NODE_ENV=production. Pass --force to override.',
+    );
+  }
+
+  const prisma = new PrismaClient({ adapter: createPrismaAdapter(env.DATABASE_URL) });
+  const storage = storageFor(env);
+  const rng = random(20261104);
+
+  try {
+    // ─── Options ───────────────────────────────────────────────────────────
+    const colourType =
+      (await prisma.optionType.findUnique({ where: { slug: 'colour' } })) ??
+      (await prisma.optionType.create({
+        data: { name: 'Colour', slug: 'colour', kind: 'color', position: 0 },
+      }));
+    const sizeType =
+      (await prisma.optionType.findUnique({ where: { slug: 'size' } })) ??
+      (await prisma.optionType.create({
+        data: { name: 'Size', slug: 'size', kind: 'text', position: 1 },
+      }));
+
+    const colourIds = new Map<string, string>();
+    for (const [position, colour] of colours.entries()) {
+      const value = await prisma.optionValue.upsert({
+        where: { optionTypeId_slug: { optionTypeId: colourType.id, slug: colour.slug } },
+        create: {
+          optionTypeId: colourType.id,
+          slug: colour.slug,
+          label: colour.label,
+          colorHex: colour.hex,
+          position,
+        },
+        update: {},
+      });
+      colourIds.set(colour.slug, value.id);
+    }
+
+    const sizeIds = new Map<string, string>();
+    for (const [position, label] of [...adultSizes, ...kidsSizes].entries()) {
+      const slug = slugify(label);
+      const value = await prisma.optionValue.upsert({
+        where: { optionTypeId_slug: { optionTypeId: sizeType.id, slug } },
+        create: { optionTypeId: sizeType.id, slug, label, position },
+        update: { position },
+      });
+      sizeIds.set(label, value.id);
+    }
+
+    // ─── Categories ────────────────────────────────────────────────────────
+    const categoryIds = new Map<string, string>();
+    for (const [position, spec] of categories.entries()) {
+      const existing = await prisma.category.findUnique({ where: { slug: spec.slug } });
+      const category =
+        existing ??
+        (await prisma.category.create({
+          data: {
+            name: spec.name,
+            slug: spec.slug,
+            description: spec.description,
+            position,
+            parentId: spec.parent ? categoryIds.get(spec.parent) : null,
+          },
+        }));
+      categoryIds.set(spec.slug, category.id);
+    }
+
+    // ─── Products ──────────────────────────────────────────────────────────
+    let created = 0;
+    for (const [index, spec] of products.entries()) {
+      if (await prisma.product.findUnique({ where: { slug: spec.slug } })) continue;
+
+      // Spread over the last six weeks, so "Newest" has an order to it.
+      const createdAt = new Date(Date.now() - (products.length - index) * 2.3 * DAY);
+      const product = await prisma.product.create({
+        data: {
+          name: spec.name,
+          slug: spec.slug,
+          description: spec.description,
+          categoryId: categoryIds.get(spec.category)!,
+          status: 'active',
+          price: toMinorUnits(spec.price, env.STORE_CURRENCY),
+          compareAtPrice: spec.compareAtPrice
+            ? toMinorUnits(spec.compareAtPrice, env.STORE_CURRENCY)
+            : null,
+          createdAt,
+          options: {
+            create: [
+              { optionTypeId: colourType.id, position: 0 },
+              ...(spec.sizes ? [{ optionTypeId: sizeType.id, position: 1 }] : []),
+            ],
+          },
+        },
+      });
+
+      let position = 0;
+      for (const colour of spec.colours) {
+        for (const size of spec.sizes ?? [null]) {
+          const valueIds = [colourIds.get(colour)!, ...(size ? [sizeIds.get(size)!] : [])];
+          // Mostly in stock, a few running low or sold out.
+          const roll = rng.next();
+          const stock = roll < 0.04 ? 0 : roll < 0.1 ? rng.int(1, 3) : rng.int(6, 30);
+          await prisma.productVariant.create({
+            data: {
+              productId: product.id,
+              sku: [spec.slug, colour, size].filter(Boolean).join('-').toUpperCase(),
+              stock,
+              position: position++,
+              combinationKey: [...valueIds].sort().join('+'),
+              optionValues: { create: valueIds.map((optionValueId) => ({ optionValueId })) },
+            },
+          });
+        }
+      }
+
+      for (const [imagePosition, colour] of spec.colours.entries()) {
+        const hex = colours.find((candidate) => candidate.slug === colour)!.hex;
+        const body = await garmentImage(spec.garment, hex, spec.pattern);
+        const key = `products/${product.id}/${randomUUID()}.webp`;
+        await storage.put(key, body, 'image/webp');
+        await prisma.productImage.create({
+          data: {
+            productId: product.id,
+            storageKey: key,
+            contentType: 'image/webp',
+            size: body.length,
+            alt: `${spec.name} in ${colours.find((candidate) => candidate.slug === colour)!.label.toLowerCase()}`,
+            position: imagePosition,
+            optionValueId: colourIds.get(colour)!,
+          },
+        });
+      }
+      created++;
+    }
+    console.log(`Products: ${created} added, ${products.length - created} already there`);
+
+    // ─── Customers ─────────────────────────────────────────────────────────
+    const auth = createAuth(prisma, env);
+    const shoppers: { id: string; email: string; name: string; city: string; line1: string }[] = [];
+    for (const [index, person] of customers.entries()) {
+      const email = `${slugify(person.name).replace('-', '.')}@${DEMO_EMAIL_DOMAIN}`;
+      let user = await prisma.user.findUnique({ where: { email } });
+      if (!user) {
+        await auth.api.signUpEmail({ body: { name: person.name, email, password: DEMO_PASSWORD } });
+        user = await prisma.user.update({
+          where: { email },
+          data: { createdAt: new Date(Date.now() - (ORDER_DAYS + 10 - index * 5) * DAY) },
+        });
+        await prisma.address.create({
+          data: {
+            userId: user.id,
+            fullName: person.name,
+            phone: `+92 30${rng.int(0, 4)} ${rng.int(1_000_000, 9_999_999)}`,
+            line1: person.line1,
+            city: person.city,
+            isDefault: true,
+          },
+        });
+      }
+      shoppers.push({ id: user.id, email, ...person });
+    }
+    console.log(`Customers: ${shoppers.length} (password: ${DEMO_PASSWORD})`);
+
+    // ─── Orders ────────────────────────────────────────────────────────────
+    const existingOrders = await prisma.order.count({
+      where: { email: { endsWith: `@${DEMO_EMAIL_DOMAIN}` } },
+    });
+    if (existingOrders > 0) {
+      console.log(`Orders: ${existingOrders} demo orders already there`);
+      return;
+    }
+
+    const variants = await prisma.productVariant.findMany({
+      where: { product: { slug: { in: products.map((spec) => spec.slug) } } },
+      select: {
+        id: true,
+        sku: true,
+        price: true,
+        product: {
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            options: { select: { optionTypeId: true }, orderBy: { position: 'asc' } },
+            images: { select: { storageKey: true, optionValueId: true } },
+          },
+        },
+        optionValues: {
+          select: {
+            optionValue: {
+              select: {
+                id: true,
+                label: true,
+                optionTypeId: true,
+                optionType: { select: { name: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const shipping = {
+      flatRate: toMinorUnits(env.SHIPPING_FLAT_RATE, env.STORE_CURRENCY),
+      freeOver:
+        env.FREE_SHIPPING_OVER === undefined
+          ? null
+          : toMinorUnits(env.FREE_SHIPPING_OVER, env.STORE_CURRENCY),
+    };
+
+    // More orders recently: ages skew towards today. Created oldest first, so
+    // order numbers rise with time as they would in a real store.
+    const placedAt = Array.from({ length: ORDER_COUNT }, () => {
+      const ageDays = Math.floor(ORDER_DAYS * rng.next() ** 1.6);
+      return {
+        ageDays,
+        createdAt: new Date(Date.now() - ageDays * DAY - rng.int(0, 10) * 3_600_000),
+      };
+    }).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+
+    for (const { ageDays, createdAt } of placedAt) {
+      const status =
+        ageDays > 14
+          ? rng.next() < 0.1
+            ? 'cancelled'
+            : 'delivered'
+          : ageDays > 5
+            ? rng.pick(['shipped', 'delivered', 'delivered'] as const)
+            : ageDays > 1
+              ? rng.pick(['confirmed', 'shipped'] as const)
+              : rng.pick(['pending', 'pending', 'confirmed'] as const);
+      const shopper = rng.pick(shoppers);
+
+      const lines = Array.from({ length: rng.int(1, 3) }, () => rng.pick(variants));
+      const items = [...new Map(lines.map((variant) => [variant.id, variant])).values()].map(
+        (variant) => {
+          const typeOrder = variant.product.options.map((option) => option.optionTypeId);
+          const values = variant.optionValues
+            .map(({ optionValue }) => optionValue)
+            .sort((a, b) => typeOrder.indexOf(a.optionTypeId) - typeOrder.indexOf(b.optionTypeId));
+          const image =
+            variant.product.images.find((candidate) =>
+              values.some((value) => value.id === candidate.optionValueId),
+            ) ?? variant.product.images[0];
+          const quantity = rng.next() < 0.8 ? 1 : 2;
+          const unitPrice = variant.price ?? variant.product.price;
+          return {
+            variantId: variant.id,
+            productId: variant.product.id,
+            productName: variant.product.name,
+            variantLabel: values
+              .map((value) => `${value.optionType.name}: ${value.label}`)
+              .join(' · '),
+            sku: variant.sku,
+            imageKey: image?.storageKey ?? null,
+            unitPrice,
+            quantity,
+            lineTotal: unitPrice * quantity,
+          };
+        },
+      );
+      const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
+      const shippingCharge = shippingFor(subtotal, shipping);
+
+      await prisma.order.create({
+        data: {
+          userId: shopper.id,
+          email: shopper.email,
+          status,
+          paymentMethod: 'cod',
+          currency: env.STORE_CURRENCY,
+          subtotal,
+          shipping: shippingCharge,
+          total: subtotal + shippingCharge,
+          fullName: shopper.name,
+          phone: '+92 300 1234567',
+          line1: shopper.line1,
+          city: shopper.city,
+          createdAt,
+          updatedAt: createdAt,
+          items: { create: items },
+        },
+      });
+    }
+    console.log(`Orders: ${ORDER_COUNT} added over the last ${ORDER_DAYS} days`);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+main().catch((error: unknown) => {
+  console.error(error instanceof Error ? error.message : error);
+  process.exitCode = 1;
+});
