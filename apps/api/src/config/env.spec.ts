@@ -15,6 +15,7 @@ describe('validateEnv', () => {
       PORT: 4000,
       STORE_CURRENCY: 'PKR',
       STORE_LOCALE: 'en-PK',
+      STORE_TIMEZONE: 'Asia/Karachi',
       SHIPPING_FLAT_RATE: 0,
       EMAIL_DRIVER: 'log',
       EMAIL_FROM: 'Anwar Shah & Sons <no-reply@localhost>',
@@ -53,6 +54,13 @@ describe('validateEnv', () => {
 
   it('rejects an unknown currency', () => {
     expect(() => validateEnv({ ...validEnv, STORE_CURRENCY: 'ABC' })).toThrow(/STORE_CURRENCY/);
+  });
+
+  it('rejects an unknown time zone', () => {
+    expect(() => validateEnv({ ...validEnv, STORE_TIMEZONE: 'Mars/Olympus' })).toThrow(
+      /STORE_TIMEZONE/,
+    );
+    expect(validateEnv({ ...validEnv, STORE_TIMEZONE: 'UTC' }).STORE_TIMEZONE).toBe('UTC');
   });
 
   it('rejects a malformed locale', () => {

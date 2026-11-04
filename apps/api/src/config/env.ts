@@ -18,6 +18,11 @@ export const envSchema = z.object({
     .default('PKR'),
   /** BCP 47 locale for formatting prices and dates. */
   STORE_LOCALE: z.string().refine(isSupportedLocale, 'Use a locale such as en-PK').default('en-PK'),
+  /** IANA time zone the store works in; the admin dashboard's "today" follows it. */
+  STORE_TIMEZONE: z
+    .string()
+    .refine(isSupportedTimeZone, 'Use an IANA time zone such as Asia/Karachi')
+    .default('Asia/Karachi'),
   /** Shipping charged per order, in major units of STORE_CURRENCY (e.g. 250 for Rs 250). */
   SHIPPING_FLAT_RATE: z.coerce.number().nonnegative().default(0),
   /** Orders at or above this subtotal (major units) ship free. Leave unset for no offer. */
@@ -63,6 +68,10 @@ const validatedEnvSchema = envSchema.superRefine((env, ctx) => {
 
 function isSupportedCurrency(code: string): boolean {
   return Intl.supportedValuesOf('currency').includes(code);
+}
+
+function isSupportedTimeZone(timeZone: string): boolean {
+  return Intl.supportedValuesOf('timeZone').includes(timeZone) || timeZone === 'UTC';
 }
 
 function isSupportedLocale(locale: string): boolean {
