@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { shippingFor } from '@repo/shared';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getAddresses } from '@/lib/api/addresses';
 import { getCart } from '@/lib/api/cart';
 import { getStoreConfig } from '@/lib/api/store';
 import { requireUser } from '@/lib/auth/session';
@@ -29,7 +30,11 @@ export default function CheckoutPage() {
 
 async function Checkout() {
   const user = await requireUser('/checkout');
-  const [cart, store] = await Promise.all([getCart(), getStoreConfig()]);
+  const [cart, store, savedAddresses] = await Promise.all([
+    getCart(),
+    getStoreConfig(),
+    getAddresses(),
+  ]);
   if (cart.lines.length === 0) redirect('/cart');
 
   const shipping = shippingFor(cart.subtotal, store.shipping);
@@ -53,6 +58,7 @@ async function Checkout() {
         )}
         <CheckoutForm
           defaultName={user.name}
+          savedAddresses={savedAddresses}
           expectedTotal={total}
           totalLabel={formatPrice(total, store)}
           disabled={unavailable.length > 0}
