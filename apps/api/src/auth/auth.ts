@@ -4,6 +4,8 @@ import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { admin } from 'better-auth/plugins/admin';
 import type { Env } from '../config/env.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
+import type { Mailer } from '../mail/mailer.js';
+import { passwordResetEmail } from '../mail/templates.js';
 
 type AuthEnv = Pick<Env, 'BETTER_AUTH_SECRET' | 'BETTER_AUTH_URL' | 'CORS_ORIGIN'>;
 
@@ -11,7 +13,7 @@ type AuthEnv = Pick<Env, 'BETTER_AUTH_SECRET' | 'BETTER_AUTH_URL' | 'CORS_ORIGIN
  * Builds the Better Auth instance. Kept as a factory so the Nest module, the
  * seed script and tests all create it the same way from their own Prisma client.
  */
-export function createAuth(prisma: PrismaClient, env: AuthEnv) {
+export function createAuth(prisma: PrismaClient, env: AuthEnv, mailer?: Mailer) {
   return betterAuth({
     appName: 'Anwar Shah & Sons',
     baseURL: env.BETTER_AUTH_URL,
@@ -24,6 +26,24 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv) {
       enabled: true,
       minPasswordLength: PASSWORD_MIN_LENGTH,
       maxPasswordLength: PASSWORD_MAX_LENGTH,
+      // Password reset needs email; scripts that build auth without a mailer don't offer it.
+      ...(mailer && {
+        resetPasswordTokenExpiresIn: 60 * 60,
+        revokeSessionsOnPasswordReset: true,
+        sendResetPassword: async ({
+          user,
+          url,
+        }: {
+          user: { email: string; name: string };
+          url: string;
+        }) => {
+          // Not awaited: a slow mail server mustn't hold the request open, and the
+          // response time mustn't hint at whether the address has an account.
+          void mailer
+            .send({ to: user.email, ...passwordResetEmail({ name: user.name, url }) })
+            .catch((error: unknown) => console.error('Password reset email failed', error));
+        },
+      }),
     },
     plugins: [admin({ defaultRole: DEFAULT_ROLE, adminRoles: [ADMIN_ROLE] })],
     advanced: {

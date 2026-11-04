@@ -7,6 +7,7 @@ import { CatalogModule } from './catalog/catalog.module.js';
 import { OriginGuard } from './common/origin.guard.js';
 import { validateEnv } from './config/env.js';
 import { HealthModule } from './health/health.module.js';
+import { MailModule } from './mail/mail.module.js';
 import { MediaModule } from './media/media.module.js';
 import { OrdersModule } from './orders/orders.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
@@ -20,6 +21,7 @@ import { UsersModule } from './users/users.module.js';
     ConfigModule.forRoot({ isGlobal: true, cache: true, validate: validateEnv }),
     PrismaModule,
     StorageModule,
+    MailModule,
     AuthModule,
     CartModule,
     CatalogModule,

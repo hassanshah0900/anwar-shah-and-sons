@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -17,6 +18,8 @@ import {
 import { lineSelect, toLine } from '../cart/cart-line.js';
 import type { Env } from '../config/env.js';
 import type { Prisma } from '../generated/prisma/client.js';
+import { Mailer } from '../mail/mailer.js';
+import { orderCancelledEmail, orderPlacedEmail, orderShippedEmail } from '../mail/templates.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { storeConfig } from '../store/store-config.js';
 
@@ -69,11 +72,20 @@ type SummaryRow = Prisma.OrderGetPayload<{ select: typeof summarySelect }>;
 /** A customer placing or viewing their own orders. */
 export type Customer = { id: string; email: string };
 
+/** Statuses the customer is emailed about, besides the order being placed. */
+const notifiedStatuses = {
+  shipped: orderShippedEmail,
+  cancelled: orderCancelledEmail,
+} satisfies Partial<Record<OrderStatus, unknown>>;
+
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService<Env, true>,
+    private readonly mailer: Mailer,
   ) {}
 
   /**
@@ -84,7 +96,7 @@ export class OrdersService {
   async checkout(customer: Customer, input: Checkout): Promise<Order> {
     const store = storeConfig(this.config);
 
-    return this.prisma.$transaction(async (tx) => {
+    const order = await this.prisma.$transaction(async (tx) => {
       const rows = await tx.cartItem.findMany({
         where: { cart: { userId: customer.id } },
         select: { ...lineSelect, cartId: true },
@@ -156,6 +168,10 @@ export class OrdersService {
       await tx.cartItem.deleteMany({ where: { cartId: rows[0]!.cartId } });
       return toOrder(order);
     });
+
+    // Only once the order is committed; a mail failure never undoes it.
+    this.notify(order, orderPlacedEmail);
+    return order;
   }
 
   /** A customer's own orders, newest first. */
@@ -190,13 +206,15 @@ export class OrdersService {
    * admins acting at once can't cancel (and restock) the same order twice.
    */
   async updateStatus(number: number, status: OrderStatus): Promise<Order> {
-    return this.prisma.$transaction(async (tx) => {
+    const { order, changed } = await this.prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({
         where: { number },
         select: { id: true, status: true },
       });
       if (!order) throw new NotFoundException('Order not found');
-      if (order.status === status) return toOrder(await this.select(tx, order.id));
+      if (order.status === status) {
+        return { order: toOrder(await this.select(tx, order.id)), changed: false };
+      }
       if (!orderStatusTransitions[order.status].includes(status)) {
         throw new ConflictException(`A ${order.status} order can't be marked ${status}`);
       }
@@ -219,8 +237,35 @@ export class OrdersService {
           });
         }
       }
-      return toOrder(await this.select(tx, order.id));
+      return { order: toOrder(await this.select(tx, order.id)), changed: true };
     });
+
+    if (changed && status in notifiedStatuses) {
+      this.notify(order, notifiedStatuses[status as keyof typeof notifiedStatuses]);
+    }
+    return order;
+  }
+
+  /** Emails the customer in the background; failures are logged, not raised. */
+  private notify(
+    order: Order,
+    template: (context: { order: Order; locale: string; orderUrl: string }) => {
+      subject: string;
+      text: string;
+      html: string;
+    },
+  ): void {
+    const webUrl = this.config.get('BETTER_AUTH_URL', { infer: true });
+    const email = template({
+      order,
+      locale: this.config.get('STORE_LOCALE', { infer: true }),
+      orderUrl: new URL(`/account/orders/${order.number}`, webUrl).toString(),
+    });
+    this.mailer
+      .send({ to: order.email, ...email })
+      .catch((error: unknown) =>
+        this.logger.error(`Email for order #${order.number} failed`, error),
+      );
   }
 
   private select(tx: Prisma.TransactionClient, id: string): Promise<OrderRow> {

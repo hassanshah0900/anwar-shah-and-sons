@@ -16,6 +16,10 @@ describe('validateEnv', () => {
       STORE_CURRENCY: 'PKR',
       STORE_LOCALE: 'en-PK',
       SHIPPING_FLAT_RATE: 0,
+      EMAIL_DRIVER: 'log',
+      EMAIL_FROM: 'Anwar Shah & Sons <no-reply@localhost>',
+      SMTP_PORT: 587,
+      SMTP_SECURE: false,
       STORAGE_DRIVER: 'local',
       STORAGE_LOCAL_DIR: 'uploads',
     });
@@ -26,6 +30,17 @@ describe('validateEnv', () => {
     expect(env.SHIPPING_FLAT_RATE).toBe(250);
     expect(env.FREE_SHIPPING_OVER).toBeUndefined();
     expect(validateEnv({ ...validEnv, FREE_SHIPPING_OVER: '5000' }).FREE_SHIPPING_OVER).toBe(5000);
+  });
+
+  it('requires an SMTP host for the smtp driver', () => {
+    expect(() => validateEnv({ ...validEnv, EMAIL_DRIVER: 'smtp' })).toThrow(/SMTP_HOST/);
+    const env = validateEnv({
+      ...validEnv,
+      EMAIL_DRIVER: 'smtp',
+      SMTP_HOST: 'email-smtp.eu-west-1.amazonaws.com',
+      SMTP_SECURE: 'true',
+    });
+    expect(env.SMTP_SECURE).toBe(true);
   });
 
   it('coerces PORT to a number', () => {

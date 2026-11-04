@@ -25,6 +25,19 @@ export const envSchema = z.object({
     (value) => (value === '' ? undefined : value),
     z.coerce.number().nonnegative().optional(),
   ),
+  /** How email is sent: "log" prints it (development), "smtp" sends it (e.g. AWS SES SMTP). */
+  EMAIL_DRIVER: z.enum(['log', 'smtp']).default('log'),
+  /** Sender shown to customers, e.g. "Anwar Shah & Sons <orders@example.com>". */
+  EMAIL_FROM: z.string().min(3).default('Anwar Shah & Sons <no-reply@localhost>'),
+  SMTP_HOST: z.string().min(1).optional(),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  /** true for implicit TLS (usually port 465); STARTTLS is used otherwise. */
+  SMTP_SECURE: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+  SMTP_USER: z.string().min(1).optional(),
+  SMTP_PASSWORD: z.string().min(1).optional(),
   /** Where uploaded media is stored: a local directory or an S3 bucket. */
   STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
   /** Directory for the local driver, relative to the API's working directory. */
@@ -38,11 +51,14 @@ export const envSchema = z.object({
 export type Env = z.infer<typeof envSchema>;
 
 const validatedEnvSchema = envSchema.superRefine((env, ctx) => {
-  if (env.STORAGE_DRIVER !== 's3') return;
-  for (const key of ['S3_BUCKET', 'S3_REGION'] as const) {
-    if (!env[key])
-      ctx.addIssue({ code: 'custom', path: [key], message: 'Required when STORAGE_DRIVER=s3' });
-  }
+  const require = (keys: readonly (keyof Env)[], reason: string) => {
+    for (const key of keys) {
+      if (!env[key])
+        ctx.addIssue({ code: 'custom', path: [key], message: `Required when ${reason}` });
+    }
+  };
+  if (env.STORAGE_DRIVER === 's3') require(['S3_BUCKET', 'S3_REGION'], 'STORAGE_DRIVER=s3');
+  if (env.EMAIL_DRIVER === 'smtp') require(['SMTP_HOST'], 'EMAIL_DRIVER=smtp');
 });
 
 function isSupportedCurrency(code: string): boolean {
