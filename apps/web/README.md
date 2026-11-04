@@ -70,7 +70,9 @@ through `src/lib/api/catalog.ts`, without cookies.
 
 ## Admin
 
-`/admin` (admins only) has Customers, Products, Categories and Options. Products are
+`/admin` (admins only) has Orders, Customers, Products, Categories and Options. Orders can be
+filtered by status and moved to their next status (confirm, ship, deliver); cancelling asks
+first and returns the items to stock. Products are
 created as drafts, get variants (generated from their options or added one by one) and can
 then be published. Each product has an image gallery: uploads are checked in the browser
 and by the API, and images can be tied to an option value such as a colour.
