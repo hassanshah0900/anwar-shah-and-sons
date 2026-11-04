@@ -19,8 +19,8 @@ const dayLabel = (date: string, locale: string, month: 'short' | 'long' = 'short
 export function RevenueChart({ daily, money }: { daily: Day[]; money: Money }) {
   const majorMax = fromMinorUnits(Math.max(0, ...daily.map((day) => day.revenue)), money.currency);
   const top = niceMax(majorMax);
-  const ticks = [top, top / 2, 0];
   const total = daily.reduce((sum, day) => sum + day.revenue, 0);
+  const ticks = total === 0 ? [] : [top, top / 2, 0];
 
   return (
     <figure className="flex flex-col gap-4">
@@ -45,6 +45,11 @@ export function RevenueChart({ daily, money }: { daily: Day[]; money: Money }) {
         </div>
 
         <div className="relative h-48 flex-1">
+          {total === 0 && (
+            <p className="absolute inset-0 z-10 grid place-items-center text-sm text-muted-foreground">
+              No sales in this period yet.
+            </p>
+          )}
           {/* Hairline gridlines at the top and middle; the baseline is solid. */}
           <div aria-hidden className="absolute inset-x-0 top-0 border-t border-border" />
           <div aria-hidden className="absolute inset-x-0 top-1/2 border-t border-border" />
