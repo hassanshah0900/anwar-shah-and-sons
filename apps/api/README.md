@@ -7,22 +7,25 @@ NestJS REST API for Anwar Shah & Sons. See the [root README](../../README.md) fo
 Copy `.env.example` to `.env`. Every variable is validated at startup by
 [`src/config/env.ts`](src/config/env.ts). The app refuses to start if one is missing or malformed.
 
-| Variable                 | Description                                          | Default       |
-| ------------------------ | ---------------------------------------------------- | ------------- |
-| `NODE_ENV`               | `development`, `test` or `production`                | `development` |
-| `PORT`                   | HTTP port                                            | `4000`        |
-| `CORS_ORIGIN`            | Origin allowed to call the API (the web app)         | (required)    |
-| `DATABASE_URL`           | PostgreSQL connection string                         | (required)    |
-| `BETTER_AUTH_SECRET`     | Signs auth cookies; at least 32 characters           | (required)    |
-| `BETTER_AUTH_URL`        | Public URL of the web app (it proxies `/api/auth/*`) | (required)    |
-| `STORE_CURRENCY`         | ISO 4217 currency for all prices                     | `PKR`         |
-| `STORE_LOCALE`           | Locale for formatting prices and dates               | `en-PK`       |
-| `SHIPPING_FLAT_RATE`     | Shipping per order, in major units (e.g. `250`)      | `0`           |
-| `FREE_SHIPPING_OVER`     | Subtotal (major units) from which shipping is free   | (none)        |
-| `STORAGE_DRIVER`         | `local` (a directory) or `s3`                        | `local`       |
-| `STORAGE_LOCAL_DIR`      | Directory for the local driver                       | `uploads`     |
-| `S3_BUCKET`, `S3_REGION` | Bucket for the S3 driver (required with `s3`)        |               |
-| `S3_ENDPOINT`            | S3-compatible endpoint such as MinIO; omit for AWS   |               |
+| Variable                                                              | Description                                              | Default                                  |
+| --------------------------------------------------------------------- | -------------------------------------------------------- | ---------------------------------------- |
+| `NODE_ENV`                                                            | `development`, `test` or `production`                    | `development`                            |
+| `PORT`                                                                | HTTP port                                                | `4000`                                   |
+| `CORS_ORIGIN`                                                         | Origin allowed to call the API (the web app)             | (required)                               |
+| `DATABASE_URL`                                                        | PostgreSQL connection string                             | (required)                               |
+| `BETTER_AUTH_SECRET`                                                  | Signs auth cookies; at least 32 characters               | (required)                               |
+| `BETTER_AUTH_URL`                                                     | Public URL of the web app (it proxies `/api/auth/*`)     | (required)                               |
+| `STORE_CURRENCY`                                                      | ISO 4217 currency for all prices                         | `PKR`                                    |
+| `STORE_LOCALE`                                                        | Locale for formatting prices and dates                   | `en-PK`                                  |
+| `SHIPPING_FLAT_RATE`                                                  | Shipping per order, in major units (e.g. `250`)          | `0`                                      |
+| `FREE_SHIPPING_OVER`                                                  | Subtotal (major units) from which shipping is free       | (none)                                   |
+| `EMAIL_DRIVER`                                                        | `log` (print emails to the console) or `smtp`            | `log`                                    |
+| `EMAIL_FROM`                                                          | Sender name and address                                  | `Anwar Shah & Sons <no-reply@localhost>` |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD` | SMTP server for the `smtp` driver (`SMTP_HOST` required) | port `587`                               |
+| `STORAGE_DRIVER`                                                      | `local` (a directory) or `s3`                            | `local`                                  |
+| `STORAGE_LOCAL_DIR`                                                   | Directory for the local driver                           | `uploads`                                |
+| `S3_BUCKET`, `S3_REGION`                                              | Bucket for the S3 driver (required with `s3`)            |                                          |
+| `S3_ENDPOINT`                                                         | S3-compatible endpoint such as MinIO; omit for AWS       |                                          |
 
 `ADMIN_NAME`, `ADMIN_EMAIL` and `ADMIN_PASSWORD` are read only by `npm run db:seed`.
 
@@ -83,6 +86,19 @@ below zero, creates the order and empties the cart. If any step fails, nothing c
 Orders copy product names, options, SKUs and prices, so catalog edits never change past
 orders. Numbers start at 1001. Status moves `pending → confirmed → shipped → delivered`, and
 `pending` or `confirmed` orders can be `cancelled`, which puts their items back in stock.
+
+## Email
+
+`Mailer` sends through the driver chosen with `EMAIL_DRIVER`. In development, `log` prints each
+email (with its links) to the API console. In production, `smtp` works with any SMTP server,
+such as AWS SES's SMTP endpoint.
+
+- **Password reset:** Better Auth emails a link to the web app's `/reset-password` page. It is
+  valid for an hour, and resetting signs out the account's other sessions.
+- **Orders:** customers are emailed when an order is placed, shipped or cancelled.
+
+Emails are sent after the request's work is committed and never make it fail; a failed send
+is logged.
 
 ## Scripts
 
