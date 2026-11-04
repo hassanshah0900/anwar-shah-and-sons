@@ -73,14 +73,18 @@ async function CartContents() {
         </dl>
         {hasUnavailable && (
           <p className="text-sm text-destructive">
-            Some items aren&apos;t available and aren&apos;t included in the subtotal.
+            Some items aren&apos;t available. Remove them or lower their quantity to check out.
           </p>
         )}
-        {/* Checkout arrives with the orders feature. */}
-        <Button size="lg" disabled>
-          Checkout
-        </Button>
-        <p className="text-center text-xs text-muted-foreground">Checkout opens soon.</p>
+        {hasUnavailable ? (
+          <Button size="lg" disabled>
+            Checkout
+          </Button>
+        ) : (
+          <Button size="lg" asChild>
+            <Link href="/checkout">Checkout</Link>
+          </Button>
+        )}
         <Link
           href="/shop"
           className="text-center text-sm underline underline-offset-4 hover:text-muted-foreground"

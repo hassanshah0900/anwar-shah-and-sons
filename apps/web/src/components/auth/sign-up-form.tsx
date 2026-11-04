@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { z } from 'zod';
 import { PASSWORD_MIN_LENGTH, signUpSchema } from '@repo/shared';
@@ -14,7 +14,6 @@ import { FormField } from '@/components/forms/form-field';
 type FieldErrors = Partial<Record<'name' | 'email' | 'password', string>>;
 
 export function SignUpForm() {
-  const router = useRouter();
   const callbackUrl = safeCallbackUrl(useSearchParams().get('callbackUrl'));
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -44,8 +43,8 @@ export function SignUpForm() {
       return;
     }
 
-    router.replace(callbackUrl);
-    router.refresh();
+    // A full page load, so cached signed-out redirects aren't reused (see SignInForm).
+    window.location.replace(callbackUrl);
   }
 
   return (
