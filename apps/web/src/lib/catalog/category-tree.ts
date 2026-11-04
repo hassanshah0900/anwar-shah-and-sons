@@ -44,3 +44,18 @@ export function descendantIds(categories: Category[], id: string): Set<string> {
   }
   return ids;
 }
+
+/** The ancestors of a category, from the top level down, not including itself. */
+export function ancestorsOf(categories: Category[], id: string): Category[] {
+  const byId = new Map(categories.map((category) => [category.id, category]));
+  const trail: Category[] = [];
+  let parentId = byId.get(id)?.parentId;
+  // The visited check guards against a cycle in bad data.
+  while (parentId && !trail.some((category) => category.id === parentId)) {
+    const parent = byId.get(parentId);
+    if (!parent) break;
+    trail.unshift(parent);
+    parentId = parent.parentId;
+  }
+  return trail;
+}
