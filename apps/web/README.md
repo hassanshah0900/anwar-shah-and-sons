@@ -30,8 +30,10 @@ it, so session cookies stay first-party on the web origin.
 - **Server:** `src/lib/auth/session.ts` (`getSessionUser`, `requireUser`, `requireAdmin`).
   Render anything that reads the session inside `<Suspense>`.
 - **Browser:** `src/lib/auth/client.ts` (sign-in, sign-up, sign-out).
-- **`src/proxy.ts`:** redirects visitors without a session cookie away from `/account`
-  and `/admin` before rendering.
+- **`src/proxy.ts`:** redirects visitors without a session cookie away from `/account`,
+  `/checkout` and `/admin` before rendering.
+- After signing in or up, the forms do a full page load, so the browser can't reuse a
+  cached "redirect to sign-in" for the page the visitor was heading to.
 
 ## Shop
 
@@ -50,6 +52,12 @@ it, so session cookies stay first-party on the web origin.
 - **`/cart`**: the bag, with quantity steppers, remove, and a subtotal. "Add to bag" on the
   product page and the header's item count use the same Server Actions
   (`src/app/(store)/cart/actions.ts`).
+
+- **`/checkout`** (signed in): shipping address, cash on delivery and the order summary. Guests
+  are sent to sign in first; their bag comes with them. The form sends back the total it
+  showed, so the API refuses the order if prices changed.
+- **`/account/orders`** and **`/account/orders/<number>`**: order history and details. A new
+  order opens with a thank-you note.
 
 A guest's cart token is kept in the `cart_token` cookie (httpOnly, 60 days) and sent to the
 API as `x-cart-token` by `src/lib/api/cart.ts`. When a signed-in shopper changes the cart, the
@@ -96,6 +104,7 @@ src/
     admin/       admin navigation and dialogs
     auth/        sign-in and sign-up forms
     cart/        header bag button, add to bag, quantity controls
+    orders/      order details and status badge
     layout/      header, footer, mobile navigation
     shop/        product card and grid, filters, sort, pagination, product page
     ui/          shadcn/ui components, restyled to the design system
