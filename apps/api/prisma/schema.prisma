@@ -29,10 +29,11 @@ model User {
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at")
 
-  sessions Session[]
-  accounts Account[]
-  cart     Cart?
-  orders   Order[]
+  sessions  Session[]
+  accounts  Account[]
+  cart      Cart?
+  orders    Order[]
+  addresses Address[]
 
   @@map("users")
 }
@@ -363,4 +364,27 @@ model OrderItem {
   @@index([variantId])
   @@index([productId])
   @@map("order_items")
+}
+
+// ─── Address book ──────────────────────────────────────────────────────────
+
+/// A customer's saved shipping address. A partial unique index in the
+/// migration allows at most one default per customer.
+model Address {
+  id         String   @id @default(cuid(2))
+  userId     String   @map("user_id")
+  fullName   String   @map("full_name")
+  phone      String
+  line1      String
+  line2      String?
+  city       String
+  postalCode String?  @map("postal_code")
+  isDefault  Boolean  @default(false) @map("is_default")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("addresses")
 }
