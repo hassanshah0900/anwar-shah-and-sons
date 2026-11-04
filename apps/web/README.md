@@ -47,6 +47,14 @@ it, so session cookies stay first-party on the web origin.
   clears the choices it can't combine with (`src/lib/catalog/variant-selection.ts`). The
   choice is kept in the URL (`?colour=black&size=m`). Drafts and unknown slugs show the 404 page.
 
+- **`/cart`**: the bag, with quantity steppers, remove, and a subtotal. "Add to bag" on the
+  product page and the header's item count use the same Server Actions
+  (`src/app/(store)/cart/actions.ts`).
+
+A guest's cart token is kept in the `cart_token` cookie (httpOnly, 60 days) and sent to the
+API as `x-cart-token` by `src/lib/api/cart.ts`. When a signed-in shopper changes the cart, the
+API has already moved any guest cart to their account, so the cookie is deleted.
+
 The page's state lives in the URL (`option=size:m`, `min`, `max`, `sort`, `page`); see
 `src/lib/catalog/listing-params.ts`. Filters are plain links and a GET form, so they work
 without JavaScript and every view can be shared. Catalog data comes from the public API
@@ -87,6 +95,7 @@ src/
     account/     account menu and sign-out
     admin/       admin navigation and dialogs
     auth/        sign-in and sign-up forms
+    cart/        header bag button, add to bag, quantity controls
     layout/      header, footer, mobile navigation
     shop/        product card and grid, filters, sort, pagination, product page
     ui/          shadcn/ui components, restyled to the design system
