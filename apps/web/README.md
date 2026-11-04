@@ -41,6 +41,12 @@ it, so session cookies stay first-party on the web origin.
 - **Navigation:** the header, mobile menu and footer list the top-level categories, so the
   menus follow what admins create.
 
+- **`/products/<slug>`**: gallery, colour and size pickers, and the chosen variant's price
+  and stock. Picking a colour shows that colour's images. Choices that are sold out or don't
+  exist with the current selection are crossed out but can still be picked; picking one
+  clears the choices it can't combine with (`src/lib/catalog/variant-selection.ts`). The
+  choice is kept in the URL (`?colour=black&size=m`). Drafts and unknown slugs show the 404 page.
+
 The page's state lives in the URL (`option=size:m`, `min`, `max`, `sort`, `page`); see
 `src/lib/catalog/listing-params.ts`. Filters are plain links and a GET form, so they work
 without JavaScript and every view can be shared. Catalog data comes from the public API
@@ -82,13 +88,13 @@ src/
     admin/       admin navigation and dialogs
     auth/        sign-in and sign-up forms
     layout/      header, footer, mobile navigation
-    shop/        product card and grid, filters, sort, pagination
+    shop/        product card and grid, filters, sort, pagination, product page
     ui/          shadcn/ui components, restyled to the design system
   config/        site name, home page copy, footer links
   lib/
     api/         server-only API clients, validated with @repo/shared schemas
     auth/        session access, auth client, safe redirects
-    catalog/     category tree, shop URL state, shop navigation
+    catalog/     category tree, shop URL state, shop navigation, variant selection
     forms/       Server Action form state
     env.ts       server environment validation
     fonts.ts     next/font definitions
