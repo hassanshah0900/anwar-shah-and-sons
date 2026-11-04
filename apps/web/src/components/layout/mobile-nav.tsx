@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { MenuIcon } from 'lucide-react';
+import { ThemeSwitcher } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { siteConfig } from '@/config/site';
@@ -37,6 +38,9 @@ export function MobileNav({ links }: { links: NavLink[] }) {
             ))}
           </ul>
         </nav>
+        <div className="mt-auto border-t p-4 sm:hidden">
+          <ThemeSwitcher />
+        </div>
       </SheetContent>
     </Sheet>
   );

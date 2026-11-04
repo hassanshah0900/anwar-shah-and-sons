@@ -5,19 +5,23 @@ import { CartButton, CartLink } from '@/components/cart/cart-button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { siteConfig } from '@/config/site';
 import { shopAllLink } from '@/lib/catalog/nav';
+import { HeaderSearch } from './header-search';
 import { MainNav, MainNavLinks, MobileNavWithCategories } from './main-nav';
 import { MobileNav } from './mobile-nav';
 
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b bg-background">
-      <div className="page-container flex h-16 items-center gap-4">
+      <div className="page-container flex h-16 items-center gap-2 sm:gap-4">
         {/* Category links stream in; until then the menus offer "Shop all". */}
         <Suspense fallback={<MobileNav links={[shopAllLink]} />}>
           <MobileNavWithCategories />
         </Suspense>
 
-        <Link href="/" className="font-heading text-2xl leading-none tracking-tight">
+        <Link
+          href="/"
+          className="font-heading text-xl leading-none tracking-tight whitespace-nowrap sm:text-2xl"
+        >
           {siteConfig.name}
         </Link>
 
@@ -27,8 +31,12 @@ export function SiteHeader() {
           </Suspense>
         </nav>
 
-        <div className="ml-auto flex items-center gap-1">
-          <ThemeToggle />
+        <div className="ml-auto flex items-center sm:gap-1">
+          <HeaderSearch />
+          {/* On phones the theme choice lives in the menu, leaving room for the logo. */}
+          <div className="hidden sm:block">
+            <ThemeToggle />
+          </div>
           {/* The header is static; only the account control waits for the session. */}
           <Suspense fallback={<SignInLink />}>
             <AccountMenu />
