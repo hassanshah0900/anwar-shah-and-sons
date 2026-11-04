@@ -1,15 +1,19 @@
 import type { Metadata } from 'next';
 import { Providers } from '@/components/providers';
+import { siteConfig } from '@/config/site';
 import { fontVariables } from '@/lib/fonts';
+import { siteUrl } from '@/lib/site-url';
 import { cn } from '@/lib/utils';
 import './globals.css';
 
 export const metadata: Metadata = {
+  metadataBase: siteUrl(),
   title: {
-    default: 'Anwar Shah & Sons',
-    template: '%s | Anwar Shah & Sons',
+    default: siteConfig.name,
+    template: `%s | ${siteConfig.name}`,
   },
-  description: 'Shop online at Anwar Shah & Sons.',
+  description: siteConfig.description,
+  openGraph: { type: 'website', siteName: siteConfig.name },
 };
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {

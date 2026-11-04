@@ -7,9 +7,10 @@ Next.js storefront for Anwar Shah & Sons. See the [root README](../../README.md)
 Copy `.env.example` to `.env.local`. Server-side variables are validated by
 [`src/lib/env.ts`](src/lib/env.ts) when first read, at request time, so the same build can target any environment.
 
-| Variable  | Description                                           |
-| --------- | ----------------------------------------------------- |
-| `API_URL` | Base URL of the NestJS API, reachable from the server |
+| Variable   | Description                                               |
+| ---------- | --------------------------------------------------------- |
+| `API_URL`  | Base URL of the NestJS API, reachable from the server     |
+| `SITE_URL` | Public URL of the store; read at build time too (see SEO) |
 
 ## Scripts
 
@@ -76,6 +77,19 @@ The page's state lives in the URL (`option=size:m`, `min`, `max`, `sort`, `page`
 `src/lib/catalog/listing-params.ts`. Filters are plain links and a GET form, so they work
 without JavaScript and every view can be shared. Catalog data comes from the public API
 through `src/lib/api/catalog.ts`, without cookies.
+
+## SEO
+
+- **`SITE_URL`** (default `http://localhost:3000`) is the store's public URL, used for absolute
+  links in metadata, `robots.txt`, the sitemap and structured data. It is read at build time,
+  so set it for builds as well as at runtime.
+- **`/robots.txt`** keeps the admin, account, cart, checkout and API out of search engines and
+  points to **`/sitemap.xml`**, which lists the fixed pages, every category and every active
+  product, built per request from the catalog.
+- **Product pages** include schema.org `Product` (price or price range, currency, stock) and
+  `BreadcrumbList` data for rich results (`src/lib/seo/structured-data.ts`).
+- **Canonical URLs:** variant choices, filters, sorting and pages point to the plain product or
+  category URL. Search results are `noindex`.
 
 ## Admin
 
