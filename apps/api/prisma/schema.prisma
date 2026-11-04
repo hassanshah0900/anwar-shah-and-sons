@@ -31,6 +31,7 @@ model User {
 
   sessions Session[]
   accounts Account[]
+  cart     Cart?
 
   @@map("users")
 }
@@ -211,6 +212,7 @@ model ProductVariant {
 
   product      Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
   optionValues VariantOptionValue[]
+  cartItems    CartItem[]
 
   @@unique([productId, combinationKey], map: "product_variants_combination_key")
   @@index([productId, position])
@@ -248,4 +250,38 @@ model ProductImage {
 
   @@index([productId, position])
   @@map("product_images")
+}
+
+// ─── Cart ──────────────────────────────────────────────────────────────────
+
+/// A shopping cart, owned by a customer (userId) or a guest (tokenHash).
+/// A CHECK constraint in the migration requires one of the two.
+model Cart {
+  id        String   @id @default(cuid(2))
+  userId    String?  @unique @map("user_id")
+  /// SHA-256 of the guest's cart token. The token itself is known only to the browser.
+  tokenHash String?  @unique @map("token_hash")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user  User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CartItem[]
+
+  @@map("carts")
+}
+
+/// One variant in a cart. Prices are not stored: the cart always shows the live price.
+/// A CHECK constraint in the migration keeps the quantity between 1 and 10.
+model CartItem {
+  cartId    String   @map("cart_id")
+  variantId String   @map("variant_id")
+  quantity  Int
+  createdAt DateTime @default(now()) @map("created_at")
+
+  cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@id([cartId, variantId])
+  @@index([variantId])
+  @@map("cart_items")
 }
