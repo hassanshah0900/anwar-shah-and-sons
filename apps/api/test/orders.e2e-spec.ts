@@ -2,6 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { orderListSchema, orderSchema, type CheckoutInput, type Order } from '@repo/shared';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
+import { Mailer, type MailMessage } from '../src/mail/mailer.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 import { createTestApp, WEB_ORIGIN } from './support/app.js';
 import { adminApi } from './support/catalog.js';
@@ -256,5 +257,46 @@ describe('Checkout and orders (e2e)', () => {
     await admin.patch(`/orders/${number}`, { status: 'confirmed' }).expect(409);
 
     await admin.get('/orders/999999').expect(404);
+  });
+
+  it('emails the customer when the order is placed, shipped or cancelled', async () => {
+    const sent: MailMessage[] = [];
+    vi.spyOn(app.get(Mailer), 'send').mockImplementation(async (message) => {
+      sent.push(message);
+    });
+    await setStock(variant.small!, 3);
+    const shopper = as(await signUpAs(app, 'mailbox@example.com'));
+
+    const subjects = async (count: number) => {
+      await vi.waitFor(() => expect(sent).toHaveLength(count));
+      return sent.map((message) => message.subject);
+    };
+
+    await shopper.add(variant.small!, 1);
+    const first = placed(
+      (await shopper.checkout({ expectedTotal: 2000 + SHIPPING }).expect(201)).body,
+    );
+    expect(await subjects(1)).toEqual([`Order #${first.number} received`]);
+    expect(sent[0]).toMatchObject({ to: 'mailbox@example.com' });
+    expect(sent[0]!.text).toContain(`http://localhost:3000/account/orders/${first.number}`);
+
+    // Confirming is internal; shipping is worth telling the customer about.
+    await admin.patch(`/orders/${first.number}`, { status: 'confirmed' }).expect(200);
+    await admin.patch(`/orders/${first.number}`, { status: 'shipped' }).expect(200);
+    expect(await subjects(2)).toContain(`Order #${first.number} is on its way`);
+
+    await shopper.add(variant.small!, 1);
+    const second = placed(
+      (await shopper.checkout({ expectedTotal: 2000 + SHIPPING }).expect(201)).body,
+    );
+    await admin.patch(`/orders/${second.number}`, { status: 'cancelled' }).expect(200);
+    // Repeating a status change sends nothing new.
+    await admin.patch(`/orders/${second.number}`, { status: 'cancelled' }).expect(200);
+    expect(await subjects(4)).toEqual([
+      `Order #${first.number} received`,
+      `Order #${first.number} is on its way`,
+      `Order #${second.number} received`,
+      `Order #${second.number} was cancelled`,
+    ]);
   });
 });
