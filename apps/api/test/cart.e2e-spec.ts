@@ -2,6 +2,8 @@ import { INestApplication } from '@nestjs/common';
 import { CART_TOKEN_HEADER, cartMutationSchema, cartSchema, type Cart } from '@repo/shared';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
+import { SchedulerRegistry } from '@nestjs/schedule';
+import { CartCleanupJob } from '../src/cart/cart-cleanup.job.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 import { createTestApp, WEB_ORIGIN } from './support/app.js';
 import { adminApi } from './support/catalog.js';
@@ -258,5 +260,38 @@ describe('Cart (e2e)', () => {
     } finally {
       await admin.patch(`/products/${productId}`, { status: 'active' }).expect(200);
     }
+  });
+
+  it('deletes guest carts left untouched past the time limit, and nothing else', async () => {
+    const DAY = 86_400_000;
+    await prisma.cart.deleteMany();
+    const oldGuest = await addAsNewGuest(variant.small!, 1);
+    const recentGuest = await addAsNewGuest(variant.small!, 1);
+    const customer = await signUpAs(app, 'cart-keeper@example.com');
+    await add(variant.medium!, 1, { cookies: customer }).expect(201);
+
+    // Age everything but the recent guest cart past the default 60 days.
+    const recentId = (
+      await prisma.cart.findFirstOrThrow({
+        orderBy: { createdAt: 'desc' },
+        where: { userId: null },
+      })
+    ).id;
+    await prisma.cart.updateMany({
+      where: { id: { not: recentId } },
+      data: { updatedAt: new Date(Date.now() - 61 * DAY) },
+    });
+
+    const job = app.get(CartCleanupJob);
+    expect(await job.run()).toBe(1);
+    expect((await getCart({ token: oldGuest })).lines).toEqual([]);
+    expect((await getCart({ token: recentGuest })).itemCount).toBe(1);
+    expect((await getCart({ cookies: customer })).itemCount).toBe(1);
+    // Running again finds nothing more to do.
+    expect(await job.run()).toBe(0);
+  });
+
+  it('schedules the clean-up daily', () => {
+    expect(app.get(SchedulerRegistry).getCronJob('guest-cart-cleanup')).toBeDefined();
   });
 });

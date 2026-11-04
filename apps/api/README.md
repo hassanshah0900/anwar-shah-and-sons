@@ -18,6 +18,7 @@ Copy `.env.example` to `.env`. Every variable is validated at startup by
 | `STORE_CURRENCY`                                                      | ISO 4217 currency for all prices                         | `PKR`                                    |
 | `STORE_TIMEZONE`                                                      | IANA time zone for the dashboard's days                  | `Asia/Karachi`                           |
 | `STORE_LOCALE`                                                        | Locale for formatting prices and dates                   | `en-PK`                                  |
+| `GUEST_CART_TTL_DAYS`                                                 | Guest carts untouched this long are deleted daily        | `60`                                     |
 | `SHIPPING_FLAT_RATE`                                                  | Shipping per order, in major units (e.g. `250`)          | `0`                                      |
 | `FREE_SHIPPING_OVER`                                                  | Subtotal (major units) from which shipping is free       | (none)                                   |
 | `EMAIL_DRIVER`                                                        | `log` (print emails to the console) or `smtp`            | `log`                                    |
@@ -78,6 +79,9 @@ the guest cart joins theirs (quantities add up, to at most 10 per item).
 Prices are never stored in the cart, so it always shows the live price. Lines whose product
 was unpublished, or whose stock fell below the quantity, are marked unavailable and left out
 of the subtotal.
+
+A daily job (03:00 UTC, `src/cart/cart-cleanup.job.ts`) deletes guest carts not changed for
+`GUEST_CART_TTL_DAYS`. Customer carts are kept. Running it on several instances is harmless.
 
 ## Orders
 

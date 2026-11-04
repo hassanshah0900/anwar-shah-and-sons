@@ -16,6 +16,7 @@ describe('validateEnv', () => {
       STORE_CURRENCY: 'PKR',
       STORE_LOCALE: 'en-PK',
       STORE_TIMEZONE: 'Asia/Karachi',
+      GUEST_CART_TTL_DAYS: 60,
       SHIPPING_FLAT_RATE: 0,
       EMAIL_DRIVER: 'log',
       EMAIL_FROM: 'Anwar Shah & Sons <no-reply@localhost>',
