@@ -22,6 +22,7 @@ describe('GET /api/v1/store (e2e)', () => {
       currency: 'PKR',
       locale: 'en-PK',
       shipping: { flatRate: 250, freeOver: 10000 },
+      paymentMethods: ['card', 'cod'], // vitest.config.e2e.ts sets a Stripe key.
     });
   });
 });

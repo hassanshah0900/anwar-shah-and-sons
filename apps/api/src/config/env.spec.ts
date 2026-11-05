@@ -18,6 +18,7 @@ describe('validateEnv', () => {
       STORE_TIMEZONE: 'Asia/Karachi',
       GUEST_CART_TTL_DAYS: 60,
       SHIPPING_FLAT_RATE: 0,
+      PAYMENT_WINDOW_MINUTES: 60,
       EMAIL_DRIVER: 'log',
       EMAIL_FROM: 'Anwar Shah & Sons <no-reply@localhost>',
       SMTP_PORT: 587,
@@ -43,6 +44,18 @@ describe('validateEnv', () => {
       SMTP_SECURE: 'true',
     });
     expect(env.SMTP_SECURE).toBe(true);
+  });
+
+  it('needs a webhook secret for card payments only in production', () => {
+    const stripe = { ...validEnv, STRIPE_SECRET_KEY: 'sk_test_1' };
+    expect(validateEnv(stripe).STRIPE_WEBHOOK_SECRET).toBeUndefined();
+    expect(() => validateEnv({ ...stripe, NODE_ENV: 'production' })).toThrow(
+      /STRIPE_WEBHOOK_SECRET/,
+    );
+  });
+
+  it('treats a blank Stripe key as none', () => {
+    expect(validateEnv({ ...validEnv, STRIPE_SECRET_KEY: '' }).STRIPE_SECRET_KEY).toBeUndefined();
   });
 
   it('coerces PORT to a number', () => {

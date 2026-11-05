@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+const optionalSecret = () =>
+  z.preprocess((value) => (value === '' ? undefined : value), z.string().min(1).optional());
+
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(4000),
@@ -32,6 +35,12 @@ export const envSchema = z.object({
     (value) => (value === '' ? undefined : value),
     z.coerce.number().nonnegative().optional(),
   ),
+  /** Turns on card payments through Stripe Checkout. Without it, only cash on delivery is offered. */
+  STRIPE_SECRET_KEY: optionalSecret(),
+  /** Verifies Stripe's webhook calls. Required in production when card payments are on. */
+  STRIPE_WEBHOOK_SECRET: optionalSecret(),
+  /** How long a customer has to pay; stock is held until then. Stripe's minimum is 30. */
+  PAYMENT_WINDOW_MINUTES: z.coerce.number().int().min(31).max(1440).default(60),
   /** How email is sent: "log" prints it (development), "smtp" sends it (e.g. AWS SES SMTP). */
   EMAIL_DRIVER: z.enum(['log', 'smtp']).default('log'),
   /** Sender shown to customers, e.g. "Anwar Shah & Sons <orders@example.com>". */
@@ -66,6 +75,9 @@ const validatedEnvSchema = envSchema.superRefine((env, ctx) => {
   };
   if (env.STORAGE_DRIVER === 's3') require(['S3_BUCKET', 'S3_REGION'], 'STORAGE_DRIVER=s3');
   if (env.EMAIL_DRIVER === 'smtp') require(['SMTP_HOST'], 'EMAIL_DRIVER=smtp');
+  if (env.NODE_ENV === 'production' && env.STRIPE_SECRET_KEY) {
+    require(['STRIPE_WEBHOOK_SECRET'], 'STRIPE_SECRET_KEY is set in production');
+  }
 });
 
 function isSupportedCurrency(code: string): boolean {
