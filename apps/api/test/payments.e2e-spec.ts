@@ -366,6 +366,7 @@ describe('Card payments (e2e)', () => {
       { paymentIntentId: `pi_${sessionId}`, idempotencyKey: `refund-${order.id}` },
     ]);
     expect(await stock()).toBe(stockBefore + 1); // Restocked once, by the cancel.
+    await vi.waitFor(() => expect(sent.at(-1)!.subject).toBe(`Your refund for order #${number}`));
   });
 
   it('refunds a paid order when it’s cancelled', async () => {
@@ -395,6 +396,52 @@ describe('Card payments (e2e)', () => {
     expect(response.body).toMatchObject({ status: 'cancelled', paymentStatus: 'paid' });
     await vi.waitFor(() => expect(sent).toHaveLength(2));
     expect(sent[1]!.text).toContain("We'll refund your payment");
+  });
+
+  it('flags a failed refund for the admin, and retrying it refunds and emails once', async () => {
+    await prisma.order.deleteMany();
+    const dashboard = async () => (await admin.get('/dashboard').expect(200)).body;
+    const { shopper, number, sessionId } = await placeCardOrder();
+    await admin.post(`/orders/${number}/refund`, {}).expect(409); // Not paid, nothing to refund.
+    stripe.pay(sessionId);
+    await paid(sessionId);
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    stripe.failNextRefund = true;
+    await admin.patch(`/orders/${number}`, { status: 'cancelled' }).expect(200);
+    await vi.waitFor(() => expect(sent).toHaveLength(2));
+
+    expect((await dashboard()).refundsDue).toBe(1);
+    const due = (await admin.get('/orders?refundDue=true').expect(200)).body;
+    expect(due.orders.map((order: Order) => order.number)).toEqual([number]);
+
+    // Stripe is still down: the refund stays due and the admin hears about it.
+    stripe.failNextRefund = true;
+    const failed = await admin.post(`/orders/${number}/refund`, {}).expect(503);
+    expect(failed.body.message).toContain("didn't go through");
+    expect((await stored(number)).paymentStatus).toBe('paid');
+
+    stripe.refunds = [];
+    const done = await admin.post(`/orders/${number}/refund`, {}).expect(201);
+    expect(done.body.paymentStatus).toBe('refunded');
+    expect(stripe.refunds).toHaveLength(1);
+    expect(stripe.refunds[0]!.idempotencyKey).toMatch(/^refund-.+-\d+$/);
+    expect((await shopper.order(number)).paymentStatus).toBe('refunded');
+    expect((await dashboard()).refundsDue).toBe(0);
+    await vi.waitFor(() => expect(sent).toHaveLength(3));
+    expect(sent[2]!.subject).toBe(`Your refund for order #${number}`);
+
+    await admin.post(`/orders/${number}/refund`, {}).expect(409);
+  });
+
+  it('only lets admins retry a refund', async () => {
+    const { shopper, number } = await placeCardOrder();
+    const cookies = await signUpAs(app, `not-admin-${number}@example.com`);
+    await request(app.getHttpServer())
+      .post(`/api/v1/admin/orders/${number}/refund`)
+      .set('Origin', WEB_ORIGIN)
+      .set('Cookie', cookies)
+      .expect(403);
+    expect((await shopper.order(number)).status).toBe('pending');
   });
 
   it('leaves unpaid card orders out of the dashboard until they’re paid', async () => {

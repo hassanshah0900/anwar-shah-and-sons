@@ -153,6 +153,26 @@ function cancelledNote(order: Order): string {
   }
 }
 
+export function orderRefundedEmail(context: OrderEmailContext): Email {
+  const { order } = context;
+  const amount = money(order.total, context);
+  return {
+    subject: `Your refund for order #${order.number}`,
+    text: [
+      `Hi ${order.address.fullName},`,
+      `We've refunded ${amount} for your cancelled order #${order.number}. It should reach you within a few days.`,
+      `View your order: ${context.orderUrl}`,
+    ].join('\n\n'),
+    html: layout(
+      [
+        `Hi ${escapeHtml(order.address.fullName)},`,
+        `We&#39;ve refunded ${escapeHtml(amount)} for your cancelled order <strong>#${order.number}</strong>. It should reach you within a few days.`,
+      ],
+      { label: 'View your order', url: context.orderUrl },
+    ),
+  };
+}
+
 export function orderCancelledEmail(context: OrderEmailContext): Email {
   const { order } = context;
   return {

@@ -2,7 +2,7 @@
 
 import { refresh } from 'next/cache';
 import { orderStatusUpdateSchema } from '@repo/shared';
-import { updateOrderStatus } from '@/lib/api/orders';
+import { retryRefund, updateOrderStatus } from '@/lib/api/orders';
 import { requireAdmin } from '@/lib/auth/session';
 import type { ActionState } from '@/lib/forms/action-state';
 import { apiErrorState } from '@/lib/forms/server';
@@ -21,6 +21,24 @@ export async function updateOrderStatusAction(
 
   try {
     await updateOrderStatus(number, parsed.data.status);
+  } catch (error) {
+    return apiErrorState(error, formData);
+  }
+  refresh();
+  return { status: 'success' };
+}
+
+export async function retryRefundAction(
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireAdmin('/admin/orders');
+
+  const number = Number(formData.get('number'));
+  if (!Number.isInteger(number)) return { status: 'error', message: 'That order is not valid.' };
+
+  try {
+    await retryRefund(number);
   } catch (error) {
     return apiErrorState(error, formData);
   }

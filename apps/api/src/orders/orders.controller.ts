@@ -81,4 +81,10 @@ export class AdminOrdersController {
   ): Promise<Order> {
     return this.orders.updateStatus(number, status);
   }
+
+  /** Tries again after a refund failed when the order was cancelled. */
+  @Post(':number/refund')
+  retryRefund(@Param('number', ParseIntPipe) number: number): Promise<Order> {
+    return this.orders.retryRefund(number);
+  }
 }

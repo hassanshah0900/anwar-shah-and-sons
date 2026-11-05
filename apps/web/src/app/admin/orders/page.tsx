@@ -36,14 +36,19 @@ export default function AdminOrdersPage({ searchParams }: PageProps<'/admin/orde
 async function Orders({ searchParams }: Pick<PageProps<'/admin/orders'>, 'searchParams'>) {
   await requireAdmin('/admin/orders');
   const raw = await searchParams;
-  const parsed = orderListQuerySchema.safeParse({ status: raw.status, page: raw.page });
+  const parsed = orderListQuerySchema.safeParse({
+    status: raw.status,
+    refundDue: raw.refundDue,
+    page: raw.page,
+  });
   const query: OrderListQuery = parsed.success ? parsed.data : { page: 1, pageSize: 25 };
 
   const [{ orders, total }, store] = await Promise.all([getAdminOrders(query), getStoreConfig()]);
   const href = (changes: Partial<OrderListQuery>) => {
-    const next = { status: query.status, page: query.page, ...changes };
+    const next = { status: query.status, refundDue: query.refundDue, page: query.page, ...changes };
     const params = new URLSearchParams();
     if (next.status) params.set('status', next.status);
+    if (next.refundDue) params.set('refundDue', 'true');
     if (next.page && next.page > 1) params.set('page', String(next.page));
     return `/admin/orders${params.size ? `?${params}` : ''}`;
   };
@@ -54,11 +59,11 @@ async function Orders({ searchParams }: Pick<PageProps<'/admin/orders'>, 'search
         {[undefined, ...orderStatuses].map((status) => (
           <Link
             key={status ?? 'all'}
-            href={href({ status, page: 1 })}
-            aria-current={query.status === status ? 'page' : undefined}
+            href={href({ status, refundDue: undefined, page: 1 })}
+            aria-current={!query.refundDue && query.status === status ? 'page' : undefined}
             className={cn(
               'rounded-md px-3 py-1.5 text-sm transition-colors',
-              query.status === status
+              !query.refundDue && query.status === status
                 ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:bg-muted hover:text-foreground',
             )}
@@ -68,9 +73,19 @@ async function Orders({ searchParams }: Pick<PageProps<'/admin/orders'>, 'search
         ))}
       </nav>
 
+      {query.refundDue && (
+        <p className="mt-6 text-sm text-muted-foreground">
+          Cancelled orders whose refund failed. Open one to try again.
+        </p>
+      )}
+
       {orders.length === 0 ? (
         <p className="mt-6 border border-dashed p-10 text-center text-sm text-muted-foreground">
-          {query.status ? `No ${query.status} orders.` : 'No orders yet.'}
+          {query.refundDue
+            ? 'No refunds are due.'
+            : query.status
+              ? `No ${query.status} orders.`
+              : 'No orders yet.'}
         </p>
       ) : (
         <div className="mt-6 border">

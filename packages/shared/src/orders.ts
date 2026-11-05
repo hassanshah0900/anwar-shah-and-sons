@@ -39,6 +39,17 @@ export function isAwaitingPayment(order: {
   );
 }
 
+/** A cancelled order whose card payment hasn't gone back yet: the refund failed. */
+export function isRefundDue(order: {
+  status: OrderStatus;
+  paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
+}): boolean {
+  return (
+    order.paymentMethod === 'card' && order.paymentStatus === 'paid' && order.status === 'cancelled'
+  );
+}
+
 const optionalText = (max: number) =>
   z
     .string()
@@ -136,6 +147,8 @@ export type OrderList = z.infer<typeof orderListSchema>;
 
 export const orderListQuerySchema = z.object({
   status: orderStatusSchema.optional(),
+  /** Admin only: just the orders with a refund due. */
+  refundDue: z.stringbool().optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
 });
