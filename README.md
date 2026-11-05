@@ -1,7 +1,7 @@
 # Anwar Shah & Sons
 
-E-commerce platform for Anwar Shah & Sons: a Next.js storefront and a NestJS REST API, in one
-TypeScript monorepo.
+An online store for Anwar Shah & Sons, my uncle's clothing business. It's built as one TypeScript
+monorepo, with a Next.js storefront and a NestJS REST API.
 
 > Infrastructure (AWS, provisioned with Terraform) lives in a [separate repository](https://github.com/hassanshah0900/anwar-shah-and-sons-infrastructure).
 
