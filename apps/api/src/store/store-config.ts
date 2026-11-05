@@ -9,6 +9,7 @@ export function storeConfig(config: ConfigService<Env, true>): StoreConfig {
   return {
     currency,
     locale: config.get('STORE_LOCALE', { infer: true }),
+    paymentMethods: config.get('STRIPE_SECRET_KEY', { infer: true }) ? ['card', 'cod'] : ['cod'],
     shipping: {
       flatRate: toMinorUnits(config.get('SHIPPING_FLAT_RATE', { infer: true }), currency),
       freeOver: freeOver === undefined ? null : toMinorUnits(freeOver, currency),

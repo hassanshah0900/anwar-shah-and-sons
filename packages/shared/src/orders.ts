@@ -20,9 +20,24 @@ export const orderStatusTransitions: Record<OrderStatus, readonly OrderStatus[]>
   cancelled: [],
 };
 
-export const paymentMethods = ['cod'] as const;
+export const paymentMethods = ['cod', 'card'] as const;
 export const paymentMethodSchema = z.enum(paymentMethods);
 export type PaymentMethod = z.infer<typeof paymentMethodSchema>;
+
+export const paymentStatuses = ['unpaid', 'paid', 'refunded'] as const;
+export const paymentStatusSchema = z.enum(paymentStatuses);
+export type PaymentStatus = z.infer<typeof paymentStatusSchema>;
+
+/** A card order whose stock is held while the customer pays. It can't be confirmed yet. */
+export function isAwaitingPayment(order: {
+  status: OrderStatus;
+  paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
+}): boolean {
+  return (
+    order.paymentMethod === 'card' && order.paymentStatus === 'unpaid' && order.status === 'pending'
+  );
+}
 
 const optionalText = (max: number) =>
   z
@@ -79,6 +94,7 @@ export const orderSchema = z.object({
   number: z.number().int().positive(),
   status: orderStatusSchema,
   paymentMethod: paymentMethodSchema,
+  paymentStatus: paymentStatusSchema,
   email: z.string(),
   address: shippingAddressSchema,
   notes: z.string().nullable(),
@@ -92,9 +108,18 @@ export const orderSchema = z.object({
 });
 export type Order = z.infer<typeof orderSchema>;
 
+/** A new order; card orders also get the page where the customer pays. */
+export const checkoutResultSchema = orderSchema.extend({ paymentUrl: z.url().nullable() });
+export type CheckoutResult = z.infer<typeof checkoutResultSchema>;
+
+export const paymentLinkSchema = z.object({ url: z.url() });
+export type PaymentLink = z.infer<typeof paymentLinkSchema>;
+
 export const orderSummarySchema = z.object({
   number: z.number().int().positive(),
   status: orderStatusSchema,
+  paymentMethod: paymentMethodSchema,
+  paymentStatus: paymentStatusSchema,
   email: z.string(),
   customerName: z.string(),
   itemCount: z.number().int().nonnegative(),

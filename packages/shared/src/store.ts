@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { paymentMethodSchema } from './orders.js';
 
 const moneySchema = z.number().int().nonnegative();
 
@@ -14,6 +15,8 @@ export const storeConfigSchema = z.object({
     /** Orders with a subtotal at or above this ship free; null when there's no such offer. */
     freeOver: moneySchema.nullable(),
   }),
+  /** How customers can pay at checkout. */
+  paymentMethods: z.array(paymentMethodSchema),
 });
 export type StoreConfig = z.infer<typeof storeConfigSchema>;
 

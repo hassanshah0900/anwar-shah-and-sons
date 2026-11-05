@@ -29,13 +29,14 @@ export async function placeOrderAction(
   });
   if (!parsed.success) return validationState(parsed.error, formData);
 
-  let number: number;
+  let destination: string;
   try {
-    ({ number } = await placeOrder(parsed.data));
+    const { number, paymentUrl } = await placeOrder(parsed.data);
+    destination = paymentUrl ?? `/account/orders/${number}?placed=1`;
   } catch (error) {
     return apiErrorState(error, formData);
   }
   // The bag is now empty: refresh so the header's count updates too.
   refresh();
-  redirect(`/account/orders/${number}?placed=1`);
+  redirect(destination);
 }

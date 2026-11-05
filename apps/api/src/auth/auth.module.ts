@@ -15,6 +15,8 @@ import { createAuth } from './auth.js';
     BetterAuthModule.forRootAsync({
       inject: [PrismaService, ConfigService, Mailer],
       useFactory: (prisma: PrismaService, config: ConfigService<Env, true>, mailer: Mailer) => ({
+        // Keeps each request's exact bytes too: webhook signatures are checked against them.
+        bodyParser: { rawBody: true },
         auth: createAuth(
           prisma,
           {

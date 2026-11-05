@@ -85,6 +85,18 @@ function addressLines({ order }: OrderEmailContext): string[] {
 
 const htmlLines = (lines: string[]) => lines.map(escapeHtml).join('<br>');
 
+function placedNote(order: Order): string {
+  return order.paymentMethod === 'card'
+    ? "We've received your payment and are getting your order ready."
+    : "We'll confirm it shortly. Payment is cash on delivery.";
+}
+
+function shippedNote(context: OrderEmailContext): string {
+  return context.order.paymentMethod === 'cod'
+    ? ` Please have ${money(context.order.total, context)} ready in cash when it arrives.`
+    : '';
+}
+
 export function orderPlacedEmail(context: OrderEmailContext): Email {
   const { order } = context;
   const name = order.address.fullName;
@@ -92,7 +104,7 @@ export function orderPlacedEmail(context: OrderEmailContext): Email {
     subject: `Order #${order.number} received`,
     text: [
       `Hi ${name},`,
-      `Thank you for your order #${order.number}. We'll confirm it shortly. Payment is cash on delivery.`,
+      `Thank you for your order #${order.number}. ${placedNote(order)}`,
       itemLines(context).join('\n'),
       totalLines(context).join('\n'),
       `Shipping to:\n${addressLines(context).join('\n')}`,
@@ -101,7 +113,7 @@ export function orderPlacedEmail(context: OrderEmailContext): Email {
     html: layout(
       [
         `Hi ${escapeHtml(name)},`,
-        `Thank you for your order <strong>#${order.number}</strong>. We&#39;ll confirm it shortly. Payment is cash on delivery.`,
+        `Thank you for your order <strong>#${order.number}</strong>. ${escapeHtml(placedNote(order))}`,
         htmlLines(itemLines(context)),
         htmlLines(totalLines(context)),
         `<strong>Shipping to</strong><br>${htmlLines(addressLines(context))}`,
@@ -117,17 +129,28 @@ export function orderShippedEmail(context: OrderEmailContext): Email {
     subject: `Order #${order.number} is on its way`,
     text: [
       `Hi ${order.address.fullName},`,
-      `Your order #${order.number} has shipped. Please have ${money(order.total, context)} ready in cash when it arrives.`,
+      `Your order #${order.number} has shipped.${shippedNote(context)}`,
       `View your order: ${context.orderUrl}`,
     ].join('\n\n'),
     html: layout(
       [
         `Hi ${escapeHtml(order.address.fullName)},`,
-        `Your order <strong>#${order.number}</strong> has shipped. Please have ${escapeHtml(money(order.total, context))} ready in cash when it arrives.`,
+        `Your order <strong>#${order.number}</strong> has shipped.${escapeHtml(shippedNote(context))}`,
       ],
       { label: 'View your order', url: context.orderUrl },
     ),
   };
+}
+
+function cancelledNote(order: Order): string {
+  switch (order.paymentStatus) {
+    case 'refunded':
+      return 'Your payment has been refunded and should reach you within a few days.';
+    case 'paid':
+      return "We'll refund your payment and let you know.";
+    default:
+      return "You haven't been charged.";
+  }
 }
 
 export function orderCancelledEmail(context: OrderEmailContext): Email {
@@ -136,13 +159,13 @@ export function orderCancelledEmail(context: OrderEmailContext): Email {
     subject: `Order #${order.number} was cancelled`,
     text: [
       `Hi ${order.address.fullName},`,
-      `Your order #${order.number} was cancelled. You haven't been charged. If this is unexpected, reply to this email.`,
+      `Your order #${order.number} was cancelled. ${cancelledNote(order)} If this is unexpected, reply to this email.`,
       `View your order: ${context.orderUrl}`,
     ].join('\n\n'),
     html: layout(
       [
         `Hi ${escapeHtml(order.address.fullName)},`,
-        `Your order <strong>#${order.number}</strong> was cancelled. You haven&#39;t been charged. If this is unexpected, reply to this email.`,
+        `Your order <strong>#${order.number}</strong> was cancelled. ${escapeHtml(cancelledNote(order))} If this is unexpected, reply to this email.`,
       ],
       { label: 'View your order', url: context.orderUrl },
     ),

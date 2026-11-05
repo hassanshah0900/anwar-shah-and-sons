@@ -64,7 +64,8 @@ it, so session cookies stay first-party on the web origin.
   (`src/app/(store)/cart/actions.ts`).
 
 - **`/checkout`** (signed in): shipping address (the default saved address is filled in, others
-  can be picked, and a new one can be saved), cash on delivery and the order summary. Guests
+  can be picked, and a new one can be saved), payment (card when the API has a Stripe key, or
+  cash on delivery) and the order summary. Guests
   are sent to sign in first; their bag comes with them. The form sends back the total it
   showed, so the API refuses the order if prices changed.
 - **`/account`**: change name and password (other devices are signed out), with links to

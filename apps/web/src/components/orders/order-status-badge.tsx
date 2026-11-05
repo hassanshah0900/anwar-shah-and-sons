@@ -1,4 +1,4 @@
-import type { OrderStatus } from '@repo/shared';
+import { isAwaitingPayment, type OrderStatus, type OrderSummary } from '@repo/shared';
 import { Badge } from '@/components/ui/badge';
 
 const variants = {
@@ -17,6 +17,14 @@ export const orderStatusLabels = {
   cancelled: 'Cancelled',
 } satisfies Record<OrderStatus, string>;
 
-export function OrderStatusBadge({ status }: { status: OrderStatus }) {
-  return <Badge variant={variants[status]}>{orderStatusLabels[status]}</Badge>;
+export function OrderStatusBadge({
+  order,
+}: {
+  order: Pick<OrderSummary, 'status' | 'paymentMethod' | 'paymentStatus'>;
+}) {
+  return (
+    <Badge variant={variants[order.status]}>
+      {isAwaitingPayment(order) ? 'Awaiting payment' : orderStatusLabels[order.status]}
+    </Badge>
+  );
 }

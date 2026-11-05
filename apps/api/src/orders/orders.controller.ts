@@ -5,10 +5,12 @@ import {
   orderListQuerySchema,
   orderStatusUpdateSchema,
   type Checkout,
+  type CheckoutResult,
   type Order,
   type OrderList,
   type OrderListQuery,
   type OrderStatusUpdate,
+  type PaymentLink,
 } from '@repo/shared';
 import { Roles, Session, type UserSession } from '@thallesp/nestjs-better-auth';
 import type { Auth } from '../auth/auth.js';
@@ -25,7 +27,7 @@ export class OrdersController {
   checkout(
     @Session() session: UserSession<Auth>,
     @Body(new ZodValidationPipe(checkoutSchema)) input: Checkout,
-  ): Promise<Order> {
+  ): Promise<CheckoutResult> {
     return this.orders.checkout({ id: session.user.id, email: session.user.email }, input);
   }
 
@@ -43,6 +45,15 @@ export class OrdersController {
     @Param('number', ParseIntPipe) number: number,
   ): Promise<Order> {
     return this.orders.findMine(session.user.id, number);
+  }
+
+  /** The page where the customer can finish paying for a card order. */
+  @Post('orders/:number/payment')
+  resumePayment(
+    @Session() session: UserSession<Auth>,
+    @Param('number', ParseIntPipe) number: number,
+  ): Promise<PaymentLink> {
+    return this.orders.resumePayment(session.user.id, number);
   }
 }
 

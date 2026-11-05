@@ -304,34 +304,48 @@ enum OrderStatus {
 
 enum PaymentMethod {
   cod
+  card
 
   @@map("payment_method")
+}
+
+enum PaymentStatus {
+  unpaid
+  paid
+  refunded
+
+  @@map("payment_status")
 }
 
 /// A placed order. Amounts are in `currency`'s minor unit, fixed at purchase.
 /// The address is copied onto the order so later profile edits don't change it.
 model Order {
-  id            String        @id @default(cuid(2))
+  id                    String        @id @default(cuid(2))
   /// Shown to people; starts at 1001 (see the migration).
-  number        Int           @unique @default(autoincrement())
+  number                Int           @unique @default(autoincrement())
   /// Null if the customer's account is deleted; the order is kept.
-  userId        String?       @map("user_id")
-  email         String
-  status        OrderStatus   @default(pending)
-  paymentMethod PaymentMethod @map("payment_method")
-  currency      String
-  subtotal      Int
-  shipping      Int
-  total         Int
-  fullName      String        @map("full_name")
-  phone         String
-  line1         String
-  line2         String?
-  city          String
-  postalCode    String?       @map("postal_code")
-  notes         String?
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
+  userId                String?       @map("user_id")
+  email                 String
+  status                OrderStatus   @default(pending)
+  paymentMethod         PaymentMethod @map("payment_method")
+  paymentStatus         PaymentStatus @default(unpaid) @map("payment_status")
+  /// The Stripe Checkout session paying a card order.
+  stripeSessionId       String?       @unique @map("stripe_session_id")
+  /// Set once paid; refunds go through it.
+  stripePaymentIntentId String?       @map("stripe_payment_intent_id")
+  currency              String
+  subtotal              Int
+  shipping              Int
+  total                 Int
+  fullName              String        @map("full_name")
+  phone                 String
+  line1                 String
+  line2                 String?
+  city                  String
+  postalCode            String?       @map("postal_code")
+  notes                 String?
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
 
   user  User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
   items OrderItem[]

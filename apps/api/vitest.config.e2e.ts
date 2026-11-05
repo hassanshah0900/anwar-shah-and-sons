@@ -33,6 +33,9 @@ export default defineConfig({
       BETTER_AUTH_URL: 'http://localhost:3000',
       SHIPPING_FLAT_RATE: '250',
       FREE_SHIPPING_OVER: '10000',
+      // Never used to reach Stripe: the gateway's network calls are faked in the tests.
+      STRIPE_SECRET_KEY: 'sk_test_e2e',
+      STRIPE_WEBHOOK_SECRET: 'whsec_e2e',
       STORAGE_DRIVER: 'local',
       STORAGE_LOCAL_DIR: join(tmpdir(), 'anwar-shah-and-sons-e2e-uploads'),
     },

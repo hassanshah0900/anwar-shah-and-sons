@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { CheckCircle2Icon } from 'lucide-react';
+import { isAwaitingPayment } from '@repo/shared';
 import { formatOrderDate, OrderDetails } from '@/components/orders/order-details';
 import { OrderStatusBadge } from '@/components/orders/order-status-badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -10,6 +11,7 @@ import { getMyOrder } from '@/lib/api/orders';
 import { ApiError } from '@/lib/api/server';
 import { getStoreConfig } from '@/lib/api/store';
 import { requireUser } from '@/lib/auth/session';
+import { PayNow } from './pay-now';
 
 type Props = PageProps<'/account/orders/[number]'>;
 
@@ -33,7 +35,7 @@ async function OrderView({ params, searchParams }: Props) {
   const number = Number(raw);
   if (!Number.isInteger(number) || number < 1) notFound();
 
-  const [order, store, { placed }] = await Promise.all([
+  const [order, store, { placed, paid }] = await Promise.all([
     getMyOrder(number).catch((error: unknown) => {
       if (error instanceof ApiError && error.status === 404) notFound();
       throw error;
@@ -45,16 +47,23 @@ async function OrderView({ params, searchParams }: Props) {
   return (
     <div className="flex flex-col gap-10">
       {placed && (
-        <div role="status" className="flex gap-3 rounded-md border p-5">
-          <CheckCircle2Icon className="mt-0.5 size-5 shrink-0" aria-hidden />
-          <div className="flex flex-col gap-1">
-            <p className="font-medium">Thank you, your order is placed.</p>
-            <p className="text-sm text-muted-foreground">
-              We&apos;ll confirm it shortly. Pay in cash when it arrives.
-            </p>
-          </div>
-        </div>
+        <Notice title="Thank you, your order is placed.">
+          We&apos;ll confirm it shortly. Pay in cash when it arrives.
+        </Notice>
       )}
+      {paid && order.paymentStatus === 'paid' && (
+        <Notice title="Thank you, we've received your payment.">
+          We&apos;re getting your order ready and have emailed you the details.
+        </Notice>
+      )}
+      {isAwaitingPayment(order) &&
+        (paid ? (
+          <Notice title="We're confirming your payment.">
+            This usually takes a moment. Refresh this page to see the latest.
+          </Notice>
+        ) : (
+          <PayNow number={order.number} />
+        ))}
 
       <header className="flex flex-col gap-3">
         <nav aria-label="Breadcrumb" className="text-xs text-muted-foreground">
@@ -64,7 +73,7 @@ async function OrderView({ params, searchParams }: Props) {
         </nav>
         <div className="flex flex-wrap items-center gap-4">
           <h1 className="text-5xl">Order #{order.number}</h1>
-          <OrderStatusBadge status={order.status} />
+          <OrderStatusBadge order={order} />
         </div>
         <p className="text-sm text-muted-foreground">
           Placed on {formatOrderDate(order.createdAt, store)}
@@ -72,6 +81,18 @@ async function OrderView({ params, searchParams }: Props) {
       </header>
 
       <OrderDetails order={order} store={store} />
+    </div>
+  );
+}
+
+function Notice({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div role="status" className="flex gap-3 rounded-md border p-5">
+      <CheckCircle2Icon className="mt-0.5 size-5 shrink-0" aria-hidden />
+      <div className="flex flex-col gap-1">
+        <p className="font-medium">{title}</p>
+        <p className="text-sm text-muted-foreground">{children}</p>
+      </div>
     </div>
   );
 }

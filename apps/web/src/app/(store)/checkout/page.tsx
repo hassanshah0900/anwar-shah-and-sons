@@ -61,6 +61,7 @@ async function Checkout() {
           savedAddresses={savedAddresses}
           expectedTotal={total}
           totalLabel={formatPrice(total, store)}
+          paymentMethods={store.paymentMethods}
           disabled={unavailable.length > 0}
         />
       </div>
