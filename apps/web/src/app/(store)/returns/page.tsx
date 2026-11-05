@@ -16,6 +16,15 @@ export default function ReturnsPage() {
       title="Returns & exchanges"
       intro={`Changed your mind or need another size? You have ${returns.windowDays} days from delivery.`}
     >
+      <ContentSection title="Changed your mind before it ships?">
+        <p>
+          You can cancel an order yourself from{' '}
+          <Link href="/account/orders" className="text-foreground underline underline-offset-4">
+            Your orders
+          </Link>{' '}
+          until it ships. If you paid by card, we refund you straight away.
+        </p>
+      </ContentSection>
       <ContentSection title="What can be returned">
         <p>
           Items that are unworn, unwashed and have their tags attached can be returned or exchanged

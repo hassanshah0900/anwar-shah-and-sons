@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { CheckCircle2Icon } from 'lucide-react';
-import { isAwaitingPayment } from '@repo/shared';
+import { canCustomerCancel, isAwaitingPayment } from '@repo/shared';
 import { formatOrderDate, OrderDetails } from '@/components/orders/order-details';
 import { OrderStatusBadge } from '@/components/orders/order-status-badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,6 +11,7 @@ import { getMyOrder } from '@/lib/api/orders';
 import { ApiError } from '@/lib/api/server';
 import { getStoreConfig } from '@/lib/api/store';
 import { requireUser } from '@/lib/auth/session';
+import { CancelOrder } from './cancel-order';
 import { PayNow } from './pay-now';
 
 type Props = PageProps<'/account/orders/[number]'>;
@@ -81,6 +82,10 @@ async function OrderView({ params, searchParams }: Props) {
       </header>
 
       <OrderDetails order={order} store={store} />
+
+      {canCustomerCancel(order) && (
+        <CancelOrder number={order.number} paid={order.paymentStatus === 'paid'} />
+      )}
     </div>
   );
 }

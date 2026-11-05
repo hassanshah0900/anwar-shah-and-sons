@@ -70,7 +70,8 @@ it, so session cookies stay first-party on the web origin.
   showed, so the API refuses the order if prices changed.
 - **`/account`**: change name and password (other devices are signed out), with links to
   orders and **`/account/addresses`**, the address book (add, edit, delete, choose a default).
-- **`/account/orders`** and **`/account/orders/<number>`**: order history and details. A new
+- **`/account/orders`** and **`/account/orders/<number>`**: order history and details, where an
+  order can be cancelled until it ships. A new
   order opens with a thank-you note.
 
 A guest's cart token is kept in the `cart_token` cookie (httpOnly, 60 days) and sent to the
