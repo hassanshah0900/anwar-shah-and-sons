@@ -25,13 +25,14 @@ export class DashboardService {
       product: { status: 'active' as const },
     };
 
-    const [today, days, pendingOrders, toShip, lowStock, lowStockCount, recent] = await Promise.all(
-      [
+    const [today, days, pendingOrders, toShip, refundsDue, lowStock, lowStockCount, recent] =
+      await Promise.all([
         this.localToday(timeZone),
         this.dailyTotals(timeZone),
         // Unpaid card orders are the customer's next step, not the store's.
         this.prisma.order.count({ where: { status: 'pending', paymentMethod: 'cod' } }),
         this.prisma.order.count({ where: { status: 'confirmed' } }),
+        this.orders.countRefundsDue(),
         this.prisma.productVariant.findMany({
           where: lowStockWhere,
           orderBy: [{ stock: 'asc' }, { updatedAt: 'desc' }],
@@ -61,8 +62,7 @@ export class DashboardService {
         }),
         this.prisma.productVariant.count({ where: lowStockWhere }),
         this.orders.listAll({ page: 1, pageSize: 5 }),
-      ],
-    );
+      ]);
 
     const byDay = new Map(days.map((row) => [row.day, row]));
     const daily = lastDays(today, DASHBOARD_DAYS).map((date) => {
@@ -86,6 +86,7 @@ export class DashboardService {
       daily,
       pendingOrders,
       toShip,
+      refundsDue,
       lowStock: lowStock.map((variant) => {
         const typeOrder = variant.product.options.map((option) => option.optionTypeId);
         return {

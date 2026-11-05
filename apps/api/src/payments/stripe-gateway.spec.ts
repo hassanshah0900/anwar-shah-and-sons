@@ -12,6 +12,26 @@ describe('toStripeAmount', () => {
   });
 });
 
+describe('StripeGateway.refund', () => {
+  const gateway = new StripeGateway('sk_test_unused', undefined);
+  const stripeError = (code: string) =>
+    Stripe.errors.StripeError.generate({ type: 'invalid_request_error', code, message: code });
+  const failWith = (error: Error) =>
+    vi
+      .spyOn((gateway as unknown as { stripe: Stripe }).stripe.refunds, 'create')
+      .mockRejectedValue(error);
+
+  it('counts a charge that was already refunded as done', async () => {
+    failWith(stripeError('charge_already_refunded'));
+    await expect(gateway.refund('pi_1', 'key')).resolves.toBeUndefined();
+  });
+
+  it('passes on other failures', async () => {
+    failWith(stripeError('rate_limit'));
+    await expect(gateway.refund('pi_1', 'key')).rejects.toThrow('rate_limit');
+  });
+});
+
 describe('StripeGateway.parseWebhook', () => {
   const secret = 'whsec_test';
   const gateway = new StripeGateway('sk_test_unused', secret);

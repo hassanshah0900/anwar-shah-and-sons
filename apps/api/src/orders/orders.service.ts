@@ -9,6 +9,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import {
   isAwaitingPayment,
+  isRefundDue,
   orderStatusTransitions,
   shippingFor,
   type Checkout,
@@ -24,7 +25,12 @@ import { lineSelect, toLine } from '../cart/cart-line.js';
 import type { Env } from '../config/env.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { Mailer } from '../mail/mailer.js';
-import { orderCancelledEmail, orderPlacedEmail, orderShippedEmail } from '../mail/templates.js';
+import {
+  orderCancelledEmail,
+  orderPlacedEmail,
+  orderRefundedEmail,
+  orderShippedEmail,
+} from '../mail/templates.js';
 import { PaymentGateway } from '../payments/payment-gateway.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { storeConfig } from '../store/store-config.js';
@@ -86,6 +92,12 @@ export type Customer = { id: string; email: string };
 
 /** Statuses the customer is emailed about, besides the order being placed. */
 const MINUTE_MS = 60_000;
+/** Cancelled orders whose refund failed (see isRefundDue). */
+const refundDueWhere = {
+  paymentMethod: 'card',
+  paymentStatus: 'paid',
+  status: 'cancelled',
+} satisfies Prisma.OrderWhereInput;
 /** How many overdue orders one run of the payments job looks at. */
 const OVERDUE_BATCH = 50;
 
@@ -307,13 +319,40 @@ export class OrdersService {
 
   /** Every order, newest first (admin). */
   listAll(query: OrderListQuery): Promise<OrderList> {
-    return this.list({ status: query.status }, query);
+    return this.list(
+      query.refundDue ? refundDueWhere : query.status ? { status: query.status } : {},
+      query,
+    );
   }
 
   async findAny(number: number): Promise<Order> {
     const order = await this.prisma.order.findUnique({ where: { number }, select: orderSelect });
     if (!order) throw new NotFoundException('Order not found');
     return toOrder(order);
+  }
+
+  countRefundsDue(): Promise<number> {
+    return this.prisma.order.count({ where: refundDueWhere });
+  }
+
+  /**
+   * Tries a failed refund again. Each try needs its own idempotency key, because
+   * Stripe replays a key's earlier failure. That can't pay twice: Stripe refuses
+   * to refund a charge beyond its amount.
+   */
+  async retryRefund(number: number): Promise<Order> {
+    const row = await this.prisma.order.findUnique({ where: { number }, select: orderSelect });
+    if (!row) throw new NotFoundException('Order not found');
+    if (!isRefundDue(row)) throw new ConflictException('This order has no refund due.');
+
+    if (!(await this.refund(row, `refund-${row.id}-${Date.now()}`))) {
+      throw new ServiceUnavailableException(
+        "The refund didn't go through. Try again, or refund it in Stripe's dashboard and then retry here.",
+      );
+    }
+    const order: Order = { ...toOrder(row), paymentStatus: 'refunded' };
+    this.notify(order, orderRefundedEmail);
+    return order;
   }
 
   /**
@@ -449,7 +488,9 @@ export class OrdersService {
 
     if (order.status === 'cancelled') {
       this.logger.warn(`Order #${order.number} was paid after being cancelled; refunding`);
-      await this.refund(order);
+      if (await this.refund(order)) {
+        this.notify({ ...toOrder(order), paymentStatus: 'refunded' }, orderRefundedEmail);
+      }
     } else {
       this.notify(toOrder(order), orderPlacedEmail);
     }
@@ -480,10 +521,10 @@ export class OrdersService {
   }
 
   /** Returns whether the money went back. On failure, the order stays marked paid. */
-  private async refund(order: OrderRow): Promise<boolean> {
+  private async refund(order: OrderRow, idempotencyKey = `refund-${order.id}`): Promise<boolean> {
     try {
       if (!order.stripePaymentIntentId) throw new Error('The order has no payment intent');
-      await this.gateway.refund(order.stripePaymentIntentId, `refund-${order.id}`);
+      await this.gateway.refund(order.stripePaymentIntentId, idempotencyKey);
       await this.prisma.order.update({
         where: { id: order.id },
         data: { paymentStatus: 'refunded' },

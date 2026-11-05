@@ -66,7 +66,15 @@ export class StripeGateway extends PaymentGateway {
   }
 
   async refund(paymentIntentId: string, idempotencyKey: string): Promise<void> {
-    await this.stripe.refunds.create({ payment_intent: paymentIntentId }, { idempotencyKey });
+    try {
+      await this.stripe.refunds.create({ payment_intent: paymentIntentId }, { idempotencyKey });
+    } catch (error) {
+      // The money is already back, e.g. refunded by hand in Stripe's dashboard.
+      if (error instanceof Stripe.errors.StripeError && error.code === 'charge_already_refunded') {
+        return;
+      }
+      throw error;
+    }
   }
 
   parseWebhook(rawBody: Buffer, signature: string): string | null {

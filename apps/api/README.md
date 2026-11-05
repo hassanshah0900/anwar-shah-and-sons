@@ -110,9 +110,10 @@ so card details never reach this app. Without it, the store offers only cash on 
 4. Viewing an unpaid order also asks Stripe, so a customer returning from paying sees it paid even
    before the webhook. Every 10 minutes, a job settles overdue orders whose webhooks never came.
 
-Cancelling a paid order refunds it. If the refund fails, the order stays cancelled and marked paid,
-the error is logged, and the refund has to be made in Stripe's dashboard. A payment arriving after
-a cancellation is refunded automatically.
+Cancelling a paid order refunds it, and so does a payment arriving after a cancellation. If the
+refund fails, the order stays cancelled and marked paid. The dashboard then shows it as a refund
+due, and the order page has a retry button (`POST /api/v1/admin/orders/<number>/refund`), which
+emails the customer once it works. A charge already refunded in Stripe's dashboard counts as done.
 
 To try it locally, with [test keys](https://dashboard.stripe.com/test/apikeys) and the
 [Stripe CLI](https://docs.stripe.com/stripe-cli):
