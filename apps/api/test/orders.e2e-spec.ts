@@ -300,6 +300,56 @@ describe('Checkout and orders (e2e)', () => {
     ]);
   });
 
+  it('lets customers cancel their own orders until they ship', async () => {
+    const sent: MailMessage[] = [];
+    vi.spyOn(app.get(Mailer), 'send').mockImplementation(async (message) => {
+      sent.push(message);
+    });
+    await setStock(variant.medium!, 10);
+    const cookies = await signUpAs(app, 'canceller@example.com');
+    const shopper = as(cookies);
+    const cancel = (number: number, who = cookies) =>
+      request(app.getHttpServer())
+        .post(`/api/v1/orders/${number}/cancel`)
+        .set('Cookie', who)
+        .set('Origin', WEB_ORIGIN);
+    const order = async () => {
+      await shopper.add(variant.medium!, 2);
+      return placed((await shopper.checkout({ expectedTotal: 6000 + SHIPPING }).expect(201)).body)
+        .number;
+    };
+
+    // A pending order goes back into stock, and repeating it changes nothing.
+    const pending = await order();
+    expect(await stockOf(variant.medium!)).toBe(8);
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    expect((await cancel(pending).expect(200)).body.status).toBe('cancelled');
+    await cancel(pending).expect(200);
+    expect(await stockOf(variant.medium!)).toBe(10);
+    await vi.waitFor(() => expect(sent).toHaveLength(2));
+    expect(sent[1]!.subject).toBe(`Order #${pending} was cancelled`);
+
+    // Nobody else can, and being signed in is required.
+    const other = await order();
+    await cancel(other, await signUpAs(app, 'not-the-canceller@example.com')).expect(404);
+    await request(app.getHttpServer())
+      .post(`/api/v1/orders/${other}/cancel`)
+      .set('Origin', WEB_ORIGIN)
+      .expect(401);
+    expect(await stockOf(variant.medium!)).toBe(8);
+
+    // A confirmed order still can; a shipped one can't.
+    await admin.patch(`/orders/${other}`, { status: 'confirmed' }).expect(200);
+    await cancel(other).expect(200);
+
+    const shipped = await order();
+    await admin.patch(`/orders/${shipped}`, { status: 'confirmed' }).expect(200);
+    await admin.patch(`/orders/${shipped}`, { status: 'shipped' }).expect(200);
+    const refused = await cancel(shipped).expect(409);
+    expect(refused.body.message).toContain("can't be cancelled");
+    expect(await stockOf(variant.medium!)).toBe(8);
+  });
+
   it('saves the address to the book when asked, once', async () => {
     await setStock(variant.small!, 3);
     const cookies = await signUpAs(app, 'saver@example.com');

@@ -121,6 +121,7 @@ describe('Card payments (e2e)', () => {
       order: async (number: number): Promise<Order> =>
         orderSchema.parse((await call('get', `/orders/${number}`).expect(200)).body),
       resume: (number: number) => call('post', `/orders/${number}/payment`),
+      cancel: (number: number) => call('post', `/orders/${number}/cancel`),
     };
   };
 
@@ -396,6 +397,27 @@ describe('Card payments (e2e)', () => {
     expect(response.body).toMatchObject({ status: 'cancelled', paymentStatus: 'paid' });
     await vi.waitFor(() => expect(sent).toHaveLength(2));
     expect(sent[1]!.text).toContain("We'll refund your payment");
+  });
+
+  it('refunds a paid order the customer cancels', async () => {
+    const { shopper, number, sessionId } = await placeCardOrder();
+    stripe.pay(sessionId);
+    await paid(sessionId);
+    stripe.refunds = [];
+
+    const response = await shopper.cancel(number).expect(200);
+
+    expect(response.body).toMatchObject({ status: 'cancelled', paymentStatus: 'refunded' });
+    expect(stripe.refunds).toHaveLength(1);
+  });
+
+  it('closes the payment page when the customer cancels before paying', async () => {
+    const { shopper, number, sessionId } = await placeCardOrder();
+
+    const response = await shopper.cancel(number).expect(200);
+
+    expect(response.body).toMatchObject({ status: 'cancelled', paymentStatus: 'unpaid' });
+    expect(stripe.expired).toContain(sessionId);
   });
 
   it('flags a failed refund for the admin, and retrying it refunds and emails once', async () => {

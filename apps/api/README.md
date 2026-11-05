@@ -93,7 +93,8 @@ below zero, creates the order and empties the cart. If any step fails, nothing c
 
 Orders copy product names, options, SKUs and prices, so catalog edits never change past
 orders. Numbers start at 1001. Status moves `pending → confirmed → shipped → delivered`, and
-`pending` or `confirmed` orders can be `cancelled`, which puts their items back in stock.
+`pending` or `confirmed` orders can be `cancelled`, which puts their items back in stock. Admins
+can do this, and so can customers for their own orders (`POST /api/v1/orders/<number>/cancel`).
 
 ## Card payments
 

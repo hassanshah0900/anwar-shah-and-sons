@@ -39,6 +39,11 @@ export function isAwaitingPayment(order: {
   );
 }
 
+/** Customers can cancel their own order until it ships. */
+export function canCustomerCancel(order: { status: OrderStatus }): boolean {
+  return order.status === 'pending' || order.status === 'confirmed';
+}
+
 /** A cancelled order whose card payment hasn't gone back yet: the refund failed. */
 export function isRefundDue(order: {
   status: OrderStatus;
