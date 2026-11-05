@@ -1,12 +1,13 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import type { Address } from '@repo/shared';
+import type { Address, PaymentMethod } from '@repo/shared';
 import { AddressFields } from '@/components/account/address-fields';
 import { FormError } from '@/components/forms/form-error';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Select,
   SelectContent,
@@ -19,6 +20,14 @@ import { formKey, initialActionState } from '@/lib/forms/action-state';
 import { placeOrderAction } from './actions';
 
 const NEW_ADDRESS = 'new';
+
+const paymentOptions: Record<PaymentMethod, { title: string; description: string }> = {
+  card: {
+    title: 'Credit or debit card',
+    description: "Pay securely on Stripe's page. Your items are held while you pay.",
+  },
+  cod: { title: 'Cash on delivery', description: 'Pay in cash when your order arrives.' },
+};
 
 const describe = (address: Address) =>
   [address.fullName, address.line1, address.city].filter(Boolean).join(', ');
@@ -33,6 +42,7 @@ export function CheckoutForm({
   savedAddresses,
   expectedTotal,
   totalLabel,
+  paymentMethods,
   disabled,
 }: {
   defaultName: string;
@@ -40,6 +50,7 @@ export function CheckoutForm({
   expectedTotal: number;
   /** The formatted total, for the button. */
   totalLabel: string;
+  paymentMethods: PaymentMethod[];
   /** Set when the bag has items that can't be bought. */
   disabled: boolean;
 }) {
@@ -48,6 +59,7 @@ export function CheckoutForm({
   const chosen = savedAddresses.find((address) => address.id === choice);
   const errors = state.fieldErrors ?? {};
   const values = state.values ?? {};
+  const [method, setMethod] = useState<string>(values.paymentMethod ?? paymentMethods[0] ?? 'cod');
 
   // After a failed submit, show what was typed; otherwise the chosen saved address.
   const defaults = state.values
@@ -114,15 +126,29 @@ export function CheckoutForm({
 
       <fieldset className="grid gap-3">
         <legend className="mb-3 text-lg font-medium">Payment</legend>
-        <input type="hidden" name="paymentMethod" value="cod" />
-        <div className="rounded-md border border-foreground p-4">
-          <p className="text-sm font-medium">Cash on delivery</p>
-          <p className="mt-1 text-sm text-muted-foreground">Pay in cash when your order arrives.</p>
-        </div>
+        <RadioGroup name="paymentMethod" value={method} onValueChange={setMethod}>
+          {paymentMethods.map((option) => (
+            <Label
+              key={option}
+              htmlFor={`payment-${option}`}
+              className="flex cursor-pointer items-start gap-3 rounded-md border p-4 has-data-[state=checked]:border-foreground"
+            >
+              <RadioGroupItem id={`payment-${option}`} value={option} className="mt-0.5" />
+              <span className="flex flex-col gap-1">
+                <span className="text-sm font-medium">{paymentOptions[option].title}</span>
+                <span className="text-sm font-normal text-muted-foreground">
+                  {paymentOptions[option].description}
+                </span>
+              </span>
+            </Label>
+          ))}
+        </RadioGroup>
       </fieldset>
 
       <Button type="submit" size="lg" disabled={pending || disabled}>
-        {pending ? 'Placing order…' : `Place order · ${totalLabel}`}
+        {pending
+          ? 'Placing order…'
+          : `${method === 'card' ? 'Continue to payment' : 'Place order'} · ${totalLabel}`}
       </Button>
     </form>
   );

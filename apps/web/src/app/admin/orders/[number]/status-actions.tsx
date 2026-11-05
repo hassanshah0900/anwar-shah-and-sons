@@ -1,7 +1,12 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import { orderStatusTransitions, type OrderStatus } from '@repo/shared';
+import {
+  isAwaitingPayment,
+  orderStatusTransitions,
+  type Order,
+  type OrderStatus,
+} from '@repo/shared';
 import { FormError } from '@/components/forms/form-error';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,12 +31,14 @@ const actionLabels: Record<OrderStatus, string> = {
 };
 
 /** The next steps allowed for an order; cancelling asks for confirmation first. */
-export function OrderStatusActions({ number, status }: { number: number; status: OrderStatus }) {
+export function OrderStatusActions({ order }: { order: Order }) {
   const [state, formAction, pending] = useActionState(updateOrderStatusAction, initialActionState);
+  const { number, status } = order;
   const next = orderStatusTransitions[status];
   if (next.length === 0) return null;
 
-  const forward = next.filter((target) => target !== 'cancelled');
+  // An unpaid card order confirms itself once the customer pays.
+  const forward = isAwaitingPayment(order) ? [] : next.filter((target) => target !== 'cancelled');
 
   return (
     <div className="flex flex-col gap-3">
@@ -47,7 +54,12 @@ export function OrderStatusActions({ number, status }: { number: number; status:
           </form>
         ))}
         {next.includes('cancelled') && (
-          <CancelOrderDialog number={number} formAction={formAction} pending={pending} />
+          <CancelOrderDialog
+            number={number}
+            refunds={order.paymentMethod === 'card' && order.paymentStatus === 'paid'}
+            formAction={formAction}
+            pending={pending}
+          />
         )}
       </div>
     </div>
@@ -56,10 +68,13 @@ export function OrderStatusActions({ number, status }: { number: number; status:
 
 function CancelOrderDialog({
   number,
+  refunds,
   formAction,
   pending,
 }: {
   number: number;
+  /** The customer paid by card, so cancelling sends the money back. */
+  refunds: boolean;
   formAction: (formData: FormData) => void;
   pending: boolean;
 }) {
@@ -85,7 +100,8 @@ function CancelOrderDialog({
           <DialogHeader>
             <DialogTitle>Cancel order #{number}?</DialogTitle>
             <DialogDescription>
-              The customer&apos;s items go back into stock. This can&apos;t be undone.
+              The customer&apos;s items go back into stock
+              {refunds ? ' and their payment is refunded' : ''}. This can&apos;t be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

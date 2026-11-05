@@ -69,7 +69,7 @@ async function Orders({ searchParams }: Pick<PageProps<'/account/orders'>, 'sear
                 {order.itemCount === 1 ? 'item' : 'items'}
               </span>
               <span>
-                <OrderStatusBadge status={order.status} />
+                <OrderStatusBadge order={order} />
               </span>
               <span className="text-right text-sm tabular-nums">
                 {formatPrice(order.total, store)}

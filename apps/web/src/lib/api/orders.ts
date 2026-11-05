@@ -1,12 +1,16 @@
 import 'server-only';
 import {
+  checkoutResultSchema,
   orderListSchema,
   orderSchema,
+  paymentLinkSchema,
   type Checkout,
+  type CheckoutResult,
   type Order,
   type OrderList,
   type OrderListQuery,
   type OrderStatus,
+  type PaymentLink,
 } from '@repo/shared';
 import { apiRequest } from './server';
 
@@ -19,8 +23,13 @@ function listParams(query: Partial<OrderListQuery>): string {
 }
 
 /** Places an order from the signed-in customer's cart. */
-export function placeOrder(input: Checkout): Promise<Order> {
-  return apiRequest('/api/v1/checkout', orderSchema, { method: 'POST', body: input });
+export function placeOrder(input: Checkout): Promise<CheckoutResult> {
+  return apiRequest('/api/v1/checkout', checkoutResultSchema, { method: 'POST', body: input });
+}
+
+/** Where the customer can finish paying for a card order. */
+export function resumePayment(number: number): Promise<PaymentLink> {
+  return apiRequest(`/api/v1/orders/${number}/payment`, paymentLinkSchema, { method: 'POST' });
 }
 
 export function getMyOrders(query: Partial<OrderListQuery> = {}): Promise<OrderList> {

@@ -123,7 +123,7 @@ async function Overview() {
                       </TableCell>
                       <TableCell>{order.customerName}</TableCell>
                       <TableCell>
-                        <OrderStatusBadge status={order.status} />
+                        <OrderStatusBadge order={order} />
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {formatPrice(order.total, money)}

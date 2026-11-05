@@ -3,7 +3,16 @@ import Link from 'next/link';
 import type { Order, StoreConfig } from '@repo/shared';
 import { formatPrice } from '@/lib/money';
 
-const paymentLabels = { cod: 'Cash on delivery' } satisfies Record<Order['paymentMethod'], string>;
+const paymentLabels = {
+  cod: 'Cash on delivery',
+  card: 'Card',
+} satisfies Record<Order['paymentMethod'], string>;
+
+const paymentStatusLabels = {
+  unpaid: 'Not paid',
+  paid: 'Paid',
+  refunded: 'Refunded',
+} satisfies Record<Order['paymentStatus'], string>;
 
 export function formatOrderDate(iso: string, store: StoreConfig): string {
   return new Intl.DateTimeFormat(store.locale, { dateStyle: 'medium' }).format(new Date(iso));
@@ -101,7 +110,9 @@ export function OrderDetails({
           <h2 id="payment-heading" className="font-sans text-base font-medium tracking-normal">
             Payment
           </h2>
-          <p className="text-muted-foreground">{paymentLabels[order.paymentMethod]}</p>
+          <p className="text-muted-foreground">
+            {paymentLabels[order.paymentMethod]} · {paymentStatusLabels[order.paymentStatus]}
+          </p>
         </section>
         {order.notes && (
           <section aria-labelledby="notes-heading" className="flex flex-col gap-2">

@@ -8,7 +8,7 @@ import { formatPrice } from '@/lib/money';
 
 export const metadata: Metadata = {
   title: 'Shipping',
-  description: 'Delivery times, charges and cash on delivery at Anwar Shah & Sons.',
+  description: 'Delivery times, charges and payment at Anwar Shah & Sons.',
 };
 
 export default function ShippingPage() {
@@ -28,10 +28,11 @@ export default function ShippingPage() {
           ships.
         </p>
       </ContentSection>
-      <ContentSection title="Paying on delivery">
+      <ContentSection title="Paying">
         <p>
-          Pay in cash when your order arrives. Please have the exact amount ready; you&apos;ll find
-          it in your order confirmation email and under Your orders.
+          Pay by card at checkout, or in cash when your order arrives. For cash, please have the
+          exact amount ready; you&apos;ll find it in your order confirmation email and under Your
+          orders.
         </p>
       </ContentSection>
     </ContentPage>

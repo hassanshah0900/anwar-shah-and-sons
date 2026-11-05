@@ -6,6 +6,7 @@ const store: StoreConfig = {
   currency: 'PKR',
   locale: 'en-PK',
   shipping: { flatRate: 250, freeOver: null },
+  paymentMethods: ['cod'],
 };
 
 const product: ProductDetail = {

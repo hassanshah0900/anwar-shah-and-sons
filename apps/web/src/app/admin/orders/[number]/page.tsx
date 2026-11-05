@@ -51,7 +51,7 @@ async function OrderView({ params }: Pick<Props, 'params'>) {
         </nav>
         <div className="flex flex-wrap items-center gap-4">
           <h1 className="text-4xl">Order #{order.number}</h1>
-          <OrderStatusBadge status={order.status} />
+          <OrderStatusBadge order={order} />
         </div>
         <p className="text-sm text-muted-foreground">
           Placed on {formatOrderDate(order.createdAt, store)} by {order.address.fullName} (
@@ -60,7 +60,7 @@ async function OrderView({ params }: Pick<Props, 'params'>) {
           </a>
           )
         </p>
-        <OrderStatusActions number={order.number} status={order.status} />
+        <OrderStatusActions order={order} />
       </header>
 
       <OrderDetails order={order} store={store} showSku />

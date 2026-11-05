@@ -104,7 +104,7 @@ async function Orders({ searchParams }: Pick<PageProps<'/admin/orders'>, 'search
                     <span className="block text-xs text-muted-foreground">{order.email}</span>
                   </TableCell>
                   <TableCell>
-                    <OrderStatusBadge status={order.status} />
+                    <OrderStatusBadge order={order} />
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{order.itemCount}</TableCell>
                   <TableCell className="text-right tabular-nums">
