@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import {
   ADMIN_ROLE,
   checkoutSchema,
@@ -45,6 +55,16 @@ export class OrdersController {
     @Param('number', ParseIntPipe) number: number,
   ): Promise<Order> {
     return this.orders.findMine(session.user.id, number);
+  }
+
+  /** Cancels the customer's own order, until it ships. */
+  @Post('orders/:number/cancel')
+  @HttpCode(200)
+  cancel(
+    @Session() session: UserSession<Auth>,
+    @Param('number', ParseIntPipe) number: number,
+  ): Promise<Order> {
+    return this.orders.cancelMine(session.user.id, number);
   }
 
   /** The page where the customer can finish paying for a card order. */

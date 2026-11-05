@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  canCustomerCancel,
   isAwaitingPayment,
   isRefundDue,
   orderStatusTransitions,
@@ -246,6 +247,24 @@ export class OrdersService {
       return toOrder(order);
     }
     return toOrder(await this.prisma.order.findFirstOrThrow({ where, select: orderSelect }));
+  }
+
+  /**
+   * Cancels the customer's own order, as an admin would: it's restocked, and
+   * refunded if paid. Cancelling it again changes nothing.
+   */
+  async cancelMine(customerId: string, number: number): Promise<Order> {
+    const order = await this.prisma.order.findFirst({
+      where: { number, userId: customerId },
+      select: { status: true },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.status !== 'cancelled' && !canCustomerCancel(order)) {
+      throw new ConflictException(
+        `This order has been ${order.status}, so it can't be cancelled. Please contact us about a return.`,
+      );
+    }
+    return this.updateStatus(number, 'cancelled');
   }
 
   /** The page where the customer can finish paying, while there's still time. */
