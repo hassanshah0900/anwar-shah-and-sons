@@ -3,7 +3,7 @@
 E-commerce platform for Anwar Shah & Sons: a Next.js storefront and a NestJS REST API, in one
 TypeScript monorepo.
 
-> Infrastructure (AWS, provisioned with Terraform) lives in a separate repository.
+> Infrastructure (AWS, provisioned with Terraform) lives in a [separate repository](https://github.com/hassanshah0900/anwar-shah-and-sons-infrastructure).
 
 ## Architecture
 
