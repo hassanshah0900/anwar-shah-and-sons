@@ -85,7 +85,7 @@ A daily job (03:00 UTC, `src/cart/cart-cleanup.job.ts`) deletes guest carts not 
 
 ## Orders
 
-Checkout needs a signed-in customer and pays cash on delivery. With `saveAddress: true` the
+Checkout needs a signed-in customer, who pays by card or cash on delivery. With `saveAddress: true` the
 address is also added to the customer's address book, unless it's already there. In one transaction it checks
 that every line is still available, compares the total with `expectedTotal` (the amount the
 shopper saw; a mismatch is refused), takes stock with a conditional update so it can't go
@@ -94,6 +94,36 @@ below zero, creates the order and empties the cart. If any step fails, nothing c
 Orders copy product names, options, SKUs and prices, so catalog edits never change past
 orders. Numbers start at 1001. Status moves `pending → confirmed → shipped → delivered`, and
 `pending` or `confirmed` orders can be `cancelled`, which puts their items back in stock.
+
+## Card payments
+
+Setting `STRIPE_SECRET_KEY` turns on card payments through Stripe Checkout, Stripe's hosted page,
+so card details never reach this app. Without it, the store offers only cash on delivery.
+
+1. Checkout creates the order as usual, holding the stock, and answers with a `paymentUrl`. The
+   cart is emptied once that page exists, so a Stripe failure leaves the bag as it was.
+2. Stripe calls `POST /api/v1/webhooks/stripe` when the session completes or expires. The
+   signature is checked against the raw body, and Stripe is then asked for the session's state,
+   so repeated or out-of-order calls are harmless.
+3. Paid orders become `confirmed` and the confirmation email goes out. Expired ones (after
+   `PAYMENT_WINDOW_MINUTES`) are cancelled and restocked.
+4. Viewing an unpaid order also asks Stripe, so a customer returning from paying sees it paid even
+   before the webhook. Every 10 minutes, a job settles overdue orders whose webhooks never came.
+
+Cancelling a paid order refunds it. If the refund fails, the order stays cancelled and marked paid,
+the error is logged, and the refund has to be made in Stripe's dashboard. A payment arriving after
+a cancellation is refunded automatically.
+
+To try it locally, with [test keys](https://dashboard.stripe.com/test/apikeys) and the
+[Stripe CLI](https://docs.stripe.com/stripe-cli):
+
+```bash
+stripe listen --forward-to localhost:4000/api/v1/webhooks/stripe # Prints STRIPE_WEBHOOK_SECRET
+```
+
+Pay with card `4242 4242 4242 4242`, any future expiry and any CVC. In production, add a webhook
+for `checkout.session.completed` and `checkout.session.expired`; the API must be reachable from the
+internet at that path.
 
 ## Email
 
