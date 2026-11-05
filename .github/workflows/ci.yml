@@ -66,3 +66,41 @@ jobs:
       # Also builds @repo/shared and generates the Prisma client, which the tests import.
       - run: npx turbo run build --filter=api
       - run: npm run test:e2e -w api
+
+  browser:
+    name: Browser tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ci
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # Builds the apps, resets the test data, then runs Playwright with the runner's Chrome.
+      - run: npm run test:browser
+      # Traces and screenshots of failed tests, downloadable from the run's page.
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: browser-test-results
+          path: apps/e2e/test-results
+          retention-days: 7
+          if-no-files-found: ignore
