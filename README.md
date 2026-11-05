@@ -32,7 +32,7 @@ flowchart LR
 | Database  | PostgreSQL, Prisma 7 (pg driver adapter) |
 | Contracts | Zod 4                                    |
 | Auth      | Better Auth (sessions, roles)            |
-| Testing   | Vitest, Supertest                        |
+| Testing   | Vitest, Supertest, Playwright            |
 | Linting   | ESLint (web), oxlint (api), Prettier     |
 | Monorepo  | npm workspaces, Turborepo                |
 
@@ -95,15 +95,16 @@ repository.
 
 Run from the repository root. Turborepo runs each task in every workspace that defines it.
 
-| Command                | Description                    |
-| ---------------------- | ------------------------------ |
-| `npm run dev`          | Start all apps in watch mode   |
-| `npm run build`        | Build all packages and apps    |
-| `npm run lint`         | Lint all workspaces            |
-| `npm run typecheck`    | Type-check all workspaces      |
-| `npm test`             | Run unit tests                 |
-| `npm run format`       | Format the repo with Prettier  |
-| `npm run format:check` | Check formatting without fixes |
+| Command                | Description                                        |
+| ---------------------- | -------------------------------------------------- |
+| `npm run dev`          | Start all apps in watch mode                       |
+| `npm run build`        | Build all packages and apps                        |
+| `npm run lint`         | Lint all workspaces                                |
+| `npm run typecheck`    | Type-check all workspaces                          |
+| `npm test`             | Run unit tests                                     |
+| `npm run test:browser` | Run browser tests (needs Postgres; see `apps/e2e`) |
+| `npm run format`       | Format the repo with Prettier                      |
+| `npm run format:check` | Check formatting without fixes                     |
 
 App-specific commands (database migrations, e2e tests) are in each app's README.
 

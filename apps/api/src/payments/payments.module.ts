@@ -13,7 +13,11 @@ import { StripeGateway } from './stripe-gateway.js';
       useFactory: (config: ConfigService<Env, true>): PaymentGateway => {
         const key = config.get('STRIPE_SECRET_KEY', { infer: true });
         return key
-          ? new StripeGateway(key, config.get('STRIPE_WEBHOOK_SECRET', { infer: true }))
+          ? new StripeGateway(
+              key,
+              config.get('STRIPE_WEBHOOK_SECRET', { infer: true }),
+              config.get('STRIPE_API_URL', { infer: true }),
+            )
           : new UnavailablePaymentGateway();
       },
     },

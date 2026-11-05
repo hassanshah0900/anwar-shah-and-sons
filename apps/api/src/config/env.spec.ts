@@ -54,6 +54,12 @@ describe('validateEnv', () => {
     );
   });
 
+  it('refuses a custom Stripe URL in production', () => {
+    const custom = { ...validEnv, STRIPE_API_URL: 'http://localhost:4311' };
+    expect(validateEnv(custom).STRIPE_API_URL).toBe('http://localhost:4311');
+    expect(() => validateEnv({ ...custom, NODE_ENV: 'production' })).toThrow(/STRIPE_API_URL/);
+  });
+
   it('treats a blank Stripe key as none', () => {
     expect(validateEnv({ ...validEnv, STRIPE_SECRET_KEY: '' }).STRIPE_SECRET_KEY).toBeUndefined();
   });

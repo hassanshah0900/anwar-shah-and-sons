@@ -39,6 +39,8 @@ export const envSchema = z.object({
   STRIPE_SECRET_KEY: optionalSecret(),
   /** Verifies Stripe's webhook calls. Required in production when card payments are on. */
   STRIPE_WEBHOOK_SECRET: optionalSecret(),
+  /** Sends Stripe calls elsewhere, for the browser tests' fake Stripe. Refused in production. */
+  STRIPE_API_URL: z.url().optional(),
   /** How long a customer has to pay; stock is held until then. Stripe's minimum is 30. */
   PAYMENT_WINDOW_MINUTES: z.coerce.number().int().min(31).max(1440).default(60),
   /** How email is sent: "log" prints it (development), "smtp" sends it (e.g. AWS SES SMTP). */
@@ -75,6 +77,13 @@ const validatedEnvSchema = envSchema.superRefine((env, ctx) => {
   };
   if (env.STORAGE_DRIVER === 's3') require(['S3_BUCKET', 'S3_REGION'], 'STORAGE_DRIVER=s3');
   if (env.EMAIL_DRIVER === 'smtp') require(['SMTP_HOST'], 'EMAIL_DRIVER=smtp');
+  if (env.NODE_ENV === 'production' && env.STRIPE_API_URL) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['STRIPE_API_URL'],
+      message: 'Must not be set in production: the Stripe secret key would be sent there',
+    });
+  }
   if (env.NODE_ENV === 'production' && env.STRIPE_SECRET_KEY) {
     require(['STRIPE_WEBHOOK_SECRET'], 'STRIPE_SECRET_KEY is set in production');
   }
