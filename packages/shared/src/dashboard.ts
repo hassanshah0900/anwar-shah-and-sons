@@ -23,6 +23,8 @@ export const dashboardSchema = z.object({
   /** Orders waiting for the store: to confirm, and confirmed but not yet shipped. */
   pendingOrders: countSchema,
   toShip: countSchema,
+  /** Cancelled orders whose refund failed; someone needs to act on these. */
+  refundsDue: countSchema,
   /** Variants of active products at or below the low-stock threshold, emptiest first. */
   lowStock: z.array(
     z.object({
