@@ -5,6 +5,7 @@ const order: Order = {
   number: 1001,
   status: 'pending',
   paymentMethod: 'cod',
+  paymentStatus: 'unpaid',
   email: 'ayesha@example.com',
   address: {
     fullName: 'Ayesha <Khan>',

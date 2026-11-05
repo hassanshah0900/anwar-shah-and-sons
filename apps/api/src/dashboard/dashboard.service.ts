@@ -29,7 +29,8 @@ export class DashboardService {
       [
         this.localToday(timeZone),
         this.dailyTotals(timeZone),
-        this.prisma.order.count({ where: { status: 'pending' } }),
+        // Unpaid card orders are the customer's next step, not the store's.
+        this.prisma.order.count({ where: { status: 'pending', paymentMethod: 'cod' } }),
         this.prisma.order.count({ where: { status: 'confirmed' } }),
         this.prisma.productVariant.findMany({
           where: lowStockWhere,
@@ -112,7 +113,8 @@ export class DashboardService {
   }
 
   /**
-   * Orders and revenue per local day over the period, cancelled orders excluded.
+   * Orders and revenue per local day over the period, without cancelled orders or
+   * card orders that haven't been paid.
    * created_at is stored in UTC, so it's converted to the store's zone first.
    */
   private dailyTotals(timeZone: string): Promise<DayRow[]> {
@@ -120,7 +122,7 @@ export class DashboardService {
       WITH local AS (
         SELECT (created_at AT TIME ZONE 'UTC' AT TIME ZONE ${timeZone})::date AS day, total
         FROM orders
-        WHERE status <> 'cancelled'
+        WHERE status <> 'cancelled' AND NOT (payment_method = 'card' AND payment_status = 'unpaid')
       )
       SELECT to_char(day, 'YYYY-MM-DD') AS day, count(*)::int AS orders, sum(total)::bigint AS revenue
       FROM local
