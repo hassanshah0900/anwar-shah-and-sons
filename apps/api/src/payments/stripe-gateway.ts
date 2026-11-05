@@ -24,9 +24,18 @@ export class StripeGateway extends PaymentGateway {
   constructor(
     secretKey: string,
     private readonly webhookSecret: string | undefined,
+    apiUrl?: string,
   ) {
     super();
-    this.stripe = new Stripe(secretKey);
+    const api = apiUrl ? new URL(apiUrl) : undefined;
+    this.stripe = new Stripe(
+      secretKey,
+      api && {
+        host: api.hostname,
+        port: api.port,
+        protocol: api.protocol === 'http:' ? 'http' : 'https',
+      },
+    );
   }
 
   async createSession(input: NewPaymentSession): Promise<PaymentSession> {
