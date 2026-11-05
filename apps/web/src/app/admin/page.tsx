@@ -40,6 +40,18 @@ async function Overview() {
 
   return (
     <div className="mt-8 flex flex-col gap-12">
+      {data.refundsDue > 0 && (
+        <p
+          role="alert"
+          className="rounded-md border border-destructive p-4 text-sm text-destructive"
+        >
+          {plural(data.refundsDue, 'refund')} failed and {data.refundsDue === 1 ? 'needs' : 'need'}{' '}
+          another try.{' '}
+          <Link href="/admin/orders?refundDue=true" className="underline underline-offset-4">
+            View {data.refundsDue === 1 ? 'it' : 'them'}
+          </Link>
+        </p>
+      )}
       <section
         aria-label="Key figures"
         className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6"

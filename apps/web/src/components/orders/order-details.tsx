@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import type { Order, StoreConfig } from '@repo/shared';
+import { isRefundDue, type Order, type StoreConfig } from '@repo/shared';
 import { formatPrice } from '@/lib/money';
 
 const paymentLabels = {
@@ -111,7 +111,8 @@ export function OrderDetails({
             Payment
           </h2>
           <p className="text-muted-foreground">
-            {paymentLabels[order.paymentMethod]} · {paymentStatusLabels[order.paymentStatus]}
+            {paymentLabels[order.paymentMethod]} ·{' '}
+            {isRefundDue(order) ? 'Refund pending' : paymentStatusLabels[order.paymentStatus]}
           </p>
         </section>
         {order.notes && (

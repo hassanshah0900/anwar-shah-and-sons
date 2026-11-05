@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { isRefundDue } from '@repo/shared';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
@@ -9,6 +10,7 @@ import { getAdminOrder } from '@/lib/api/orders';
 import { ApiError } from '@/lib/api/server';
 import { getStoreConfig } from '@/lib/api/store';
 import { requireAdmin } from '@/lib/auth/session';
+import { RetryRefund } from './retry-refund';
 import { OrderStatusActions } from './status-actions';
 
 type Props = PageProps<'/admin/orders/[number]'>;
@@ -61,6 +63,7 @@ async function OrderView({ params }: Pick<Props, 'params'>) {
           )
         </p>
         <OrderStatusActions order={order} />
+        {isRefundDue(order) && <RetryRefund number={order.number} />}
       </header>
 
       <OrderDetails order={order} store={store} showSku />

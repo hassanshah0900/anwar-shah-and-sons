@@ -1,4 +1,4 @@
-import { isAwaitingPayment, type OrderStatus, type OrderSummary } from '@repo/shared';
+import { isAwaitingPayment, isRefundDue, type OrderStatus, type OrderSummary } from '@repo/shared';
 import { Badge } from '@/components/ui/badge';
 
 const variants = {
@@ -24,7 +24,11 @@ export function OrderStatusBadge({
 }) {
   return (
     <Badge variant={variants[order.status]}>
-      {isAwaitingPayment(order) ? 'Awaiting payment' : orderStatusLabels[order.status]}
+      {isAwaitingPayment(order)
+        ? 'Awaiting payment'
+        : isRefundDue(order)
+          ? 'Refund pending'
+          : orderStatusLabels[order.status]}
     </Badge>
   );
 }

@@ -17,6 +17,7 @@ import { apiRequest } from './server';
 function listParams(query: Partial<OrderListQuery>): string {
   const params = new URLSearchParams();
   if (query.status) params.set('status', query.status);
+  if (query.refundDue) params.set('refundDue', 'true');
   if (query.page && query.page > 1) params.set('page', String(query.page));
   if (query.pageSize) params.set('pageSize', String(query.pageSize));
   return params.size ? `?${params}` : '';
@@ -46,6 +47,10 @@ export function getAdminOrders(query: Partial<OrderListQuery> = {}): Promise<Ord
 
 export function getAdminOrder(number: number): Promise<Order> {
   return apiRequest(`/api/v1/admin/orders/${number}`, orderSchema);
+}
+
+export function retryRefund(number: number): Promise<Order> {
+  return apiRequest(`/api/v1/admin/orders/${number}/refund`, orderSchema, { method: 'POST' });
 }
 
 export function updateOrderStatus(number: number, status: OrderStatus): Promise<Order> {
