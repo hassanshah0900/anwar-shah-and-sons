@@ -96,10 +96,15 @@ export async function placePaidOrder(page: Page): Promise<number> {
 export const paymentSection = (page: Page) =>
   page.locator('section[aria-labelledby=payment-heading]');
 
-/** Makes Stripe refuse refunds, or accept them again. */
-export const setRefundsFailing = async (page: Page, fail: boolean) => {
-  const response = await page.request.post(`${FAKE_STRIPE_URL}/test/fail-refunds`, {
+const setFailing = async (page: Page, what: string, fail: boolean) => {
+  const response = await page.request.post(`${FAKE_STRIPE_URL}/test/fail-${what}`, {
     form: { fail: String(fail) },
   });
   expect(response.ok()).toBe(true);
 };
+
+/** Makes Stripe refuse refunds, or accept them again. */
+export const setRefundsFailing = (page: Page, fail: boolean) => setFailing(page, 'refunds', fail);
+
+/** Makes Stripe refuse new payment pages, or accept them again. */
+export const setSessionsFailing = (page: Page, fail: boolean) => setFailing(page, 'sessions', fail);

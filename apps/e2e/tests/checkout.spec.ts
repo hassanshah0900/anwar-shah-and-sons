@@ -11,6 +11,7 @@ import {
   paymentSection,
   placeCashOrder,
   placePaidOrder,
+  setSessionsFailing,
 } from './helpers.ts';
 
 const digits = (text: string) => text.replace(/\D/g, '');
@@ -108,6 +109,28 @@ test('an order not paid in time is cancelled', async ({ browser }) => {
   await expect(main(page)).toContainText('Cancelled');
   await expect(main(page).getByRole('button', { name: 'Pay now' })).toHaveCount(0);
   await expect(paymentSection(page)).toContainText('Card · Not paid');
+});
+
+test('when Stripe is down, the customer is told and keeps their bag', async ({ browser }) => {
+  const page = await newShopper(browser);
+  await addToBag(page);
+  await fillAddress(page);
+  await setSessionsFailing(page, true);
+  try {
+    await main(page)
+      .getByRole('button', { name: /continue to payment/i })
+      .click();
+    await expect(main(page)).toContainText("you haven't been charged");
+    await expect(page).toHaveURL(/\/checkout/);
+  } finally {
+    await setSessionsFailing(page, false);
+  }
+
+  // It works once Stripe is back, with the bag and the typed address intact.
+  await main(page)
+    .getByRole('button', { name: /continue to payment/i })
+    .click();
+  await page.waitForURL(`${FAKE_STRIPE_URL}/**`);
 });
 
 test('the checkout refuses an incomplete address', async ({ browser }) => {

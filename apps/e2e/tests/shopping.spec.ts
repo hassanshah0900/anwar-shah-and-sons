@@ -53,8 +53,8 @@ test('customers can’t open the admin area', async ({ browser }) => {
 
 test('the product page is shareable with a chosen option', async ({ page }) => {
   await page.goto(`/products/${PRODUCT_SLUG}`);
-  await main(page).locator('fieldset').first().locator('input[type=radio]').first().check({
-    force: true,
-  });
+  // A default choice stays out of the URL, so pick one that isn't already chosen.
+  const option = main(page).locator('fieldset').first().locator('input[type=radio]:not(:checked)');
+  await option.first().check({ force: true });
   await expect(page).toHaveURL(/\?/);
 });

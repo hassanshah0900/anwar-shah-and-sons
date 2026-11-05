@@ -23,6 +23,7 @@ type Session = {
 const sessions = new Map<string, Session>();
 const refunded = new Set<string>();
 let failRefunds = false;
+let failSessions = false;
 let count = 0;
 
 const readBody = async (request: IncomingMessage) => {
@@ -111,6 +112,7 @@ async function route(request: IncomingMessage, response: ServerResponse) {
 
   // Stripe's API.
   if (pathname === '/v1/checkout/sessions' && post) {
+    if (failSessions) return stripeError(response, 400, 'session_failed');
     return json(response, 200, createSession(await readBody(request)));
   }
   if (pathname.startsWith('/v1/checkout/sessions/') && session) {
@@ -144,6 +146,10 @@ async function route(request: IncomingMessage, response: ServerResponse) {
   if (pathname === '/test/fail-refunds' && post) {
     failRefunds = (await readBody(request)).get('fail') === 'true';
     return json(response, 200, { failRefunds });
+  }
+  if (pathname === '/test/fail-sessions' && post) {
+    failSessions = (await readBody(request)).get('fail') === 'true';
+    return json(response, 200, { failSessions });
   }
   if (parts[0] === 'test' && parts[1] === 'expire' && post && session) {
     session.status = 'expired';
