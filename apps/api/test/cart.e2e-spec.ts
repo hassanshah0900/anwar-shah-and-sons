@@ -248,6 +248,43 @@ describe('Cart (e2e)', () => {
     expect((await getCart({ token })).lines).toEqual([]);
   });
 
+  // A page and its header's bag badge load the cart at the same moment, right after sign-in.
+  describe('when several requests arrive at once right after sign-in', () => {
+    const ROUNDS = 10;
+    const atOnce = (who: Who) => Promise.all(Array.from({ length: 6 }, () => getCart(who)));
+
+    it('keeps a guest cart that becomes the customer’s', async () => {
+      for (let round = 0; round < ROUNDS; round++) {
+        const token = await addAsNewGuest(variant.medium!, 2);
+        const cookies = await signUpAs(app, `race-adopter-${round}@example.com`);
+
+        await atOnce({ cookies, token });
+
+        expect((await getCart({ cookies })).itemCount).toBe(2);
+      }
+    });
+
+    it('merges a guest cart only once', async () => {
+      for (let round = 0; round < ROUNDS; round++) {
+        const cookies = await signUpAs(app, `race-merger-${round}@example.com`);
+        await add(variant.small!, 1, { cookies }).expect(201);
+        const token = await addAsNewGuest(variant.medium!, 2);
+
+        await atOnce({ cookies, token });
+
+        const lines = new Map(
+          (await getCart({ cookies })).lines.map((l) => [l.variantId, l.quantity]),
+        );
+        expect(lines).toEqual(
+          new Map([
+            [variant.small, 1],
+            [variant.medium, 2],
+          ]),
+        );
+      }
+    });
+  });
+
   it('keeps unpublished products in the cart but out of the subtotal', async () => {
     const token = await addAsNewGuest(variant.small!, 1);
     await add(variant.medium!, 1, { token }).expect(201);

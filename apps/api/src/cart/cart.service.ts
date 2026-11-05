@@ -102,15 +102,18 @@ export class CartService {
     if (owner.userId) {
       const userId = owner.userId;
       const own = await this.prisma.cart.findUnique({ where: { userId }, select: { id: true } });
-      if (guest && own) {
+      // Another request may have just given this guest cart to the customer, making them
+      // the same cart. Never merge a cart into itself: that would delete it.
+      if (guest && own && guest.id !== own.id) {
         await this.merge(guest.id, own.id);
-      } else if (guest) {
-        // No customer cart yet: the guest cart simply becomes theirs.
-        await this.prisma.cart.update({
-          where: { id: guest.id },
+      } else if (guest && !own) {
+        // No customer cart yet: the guest cart simply becomes theirs, if nobody beat us to it.
+        const { count } = await this.prisma.cart.updateMany({
+          where: { id: guest.id, tokenHash: { not: null } },
           data: { userId, tokenHash: null },
         });
-        return { cartId: guest.id, token: null };
+        if (count === 1) return { cartId: guest.id, token: null };
+        return this.resolve({ userId }, create);
       }
       if (own) return { cartId: own.id, token: null };
       if (!create) return null;
@@ -128,13 +131,18 @@ export class CartService {
     return { cartId: cart.id, token };
   }
 
-  /** Moves a guest cart's items into a customer cart, then deletes the guest cart. */
+  /**
+   * Moves a guest cart's items into a customer cart, deleting the guest cart. A
+   * page's requests often arrive together, so deleting comes first: the others wait
+   * on it, then find nothing to delete and stop. Items only move once.
+   */
   private async merge(fromId: string, intoId: string): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
-      const [from, into] = await Promise.all([
-        tx.cartItem.findMany({ where: { cartId: fromId } }),
-        tx.cartItem.findMany({ where: { cartId: intoId } }),
-      ]);
+      const from = await tx.cartItem.findMany({ where: { cartId: fromId } });
+      const { count } = await tx.cart.deleteMany({ where: { id: fromId } });
+      if (count === 0) return;
+
+      const into = await tx.cartItem.findMany({ where: { cartId: intoId } });
       const held = new Map(into.map((item) => [item.variantId, item.quantity]));
       for (const item of from) {
         const quantity = Math.min(
@@ -147,7 +155,6 @@ export class CartService {
           update: { quantity },
         });
       }
-      await tx.cart.delete({ where: { id: fromId } });
     });
   }
 
