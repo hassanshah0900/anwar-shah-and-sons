@@ -302,6 +302,16 @@ async function main() {
               ? rng.pick(['confirmed', 'shipped'] as const)
               : rng.pick(['pending', 'pending', 'confirmed'] as const);
       const shopper = rng.pick(shoppers);
+      // Card orders are paid at checkout, so only cash orders wait as pending.
+      const paymentMethod = status !== 'pending' && rng.next() < 0.4 ? 'card' : 'cod';
+      const paymentStatus =
+        paymentMethod === 'cod'
+          ? status === 'delivered'
+            ? 'paid'
+            : 'unpaid'
+          : status === 'cancelled'
+            ? 'refunded'
+            : 'paid';
 
       const lines = Array.from({ length: rng.int(1, 3) }, () => rng.pick(variants));
       const items = [...new Map(lines.map((variant) => [variant.id, variant])).values()].map(
@@ -339,7 +349,8 @@ async function main() {
           userId: shopper.id,
           email: shopper.email,
           status,
-          paymentMethod: 'cod',
+          paymentMethod,
+          paymentStatus,
           currency: env.STORE_CURRENCY,
           subtotal,
           shipping: shippingCharge,
