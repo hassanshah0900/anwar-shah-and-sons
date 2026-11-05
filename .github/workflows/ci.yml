@@ -33,3 +33,36 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  api-e2e:
+    name: API e2e tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # A throwaway database that exists only for this job, so these credentials aren't secrets.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        # Steps start only once the database reports healthy.
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ci
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # Also builds @repo/shared and generates the Prisma client, which the tests import.
+      - run: npx turbo run build --filter=api
+      - run: npm run test:e2e -w api
