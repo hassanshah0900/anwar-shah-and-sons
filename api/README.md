@@ -158,9 +158,24 @@ is logged.
 | `npm run db:migrate`       | Apply pending migrations (development)                          |
 | `npm run db:deploy`        | Apply pending migrations from the build in `dist/` (production) |
 | `npm run db:studio`        | Browse the database in Drizzle Studio                           |
-| `npm run db:generate`      | Generate the Prisma client (until the move to Drizzle ends)     |
+| `npm run db:seed`          | Create or promote the admin from `ADMIN_*`                      |
+| `npm run db:seed:demo`     | Add demo products, customers, reviews and orders                |
 
 Run them from this directory, or from the root with `npm run <script> -w api`.
+
+## Changing the database
+
+The schema is TypeScript, in `src/db/schema`. Query types come from it directly, so there's
+nothing to generate.
+
+1. Edit the tables in `src/db/schema`.
+2. `npm run db:new-migration -- --name what-changed` writes the SQL to `drizzle/`. Read it:
+   renames, for example, can come out as a drop and an add.
+3. `npm run db:migrate` applies it. Commit the schema change and the migration together.
+
+Drizzle can't express triggers or sequence settings, so those are written by hand in a
+migration (see the end of `drizzle/0000_baseline.sql`). Don't use `drizzle-kit push`: it
+changes the database without a migration, so other databases never get the change.
 
 ## Structure
 
@@ -170,18 +185,15 @@ src/
   catalog/      categories, product options, products and variants
   common/       validation pipe, error filter, origin guard
   config/       environment validation
-  db/           Drizzle schema, connection pool and migration runner
-  prisma/       PrismaService (being replaced by db/)
+  db/           Drizzle schema, connection pool, query helpers and migration runner
   health/       health check module
   store/        store settings endpoint
   storage/      media storage drivers (local, S3) and image type detection
   media/        serves uploaded media
   storefront/   public catalog: categories, product listing and pages
   users/        current user and admin user list
-  generated/    Prisma client (generated, git-ignored)
   app.setup.ts  HTTP setup shared by main.ts and e2e tests
 drizzle/        migrations (SQL), written by `npm run db:new-migration`
-prisma/
-  schema.prisma Prisma's copy of the schema (being replaced by src/db/schema)
+seed/           admin and demo data scripts
 test/           e2e tests
 ```

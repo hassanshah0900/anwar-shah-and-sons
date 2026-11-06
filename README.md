@@ -23,18 +23,18 @@ flowchart LR
 
 ## Tech stack
 
-| Area      | Choice                                         |
-| --------- | ---------------------------------------------- |
-| Language  | TypeScript (strict)                            |
-| Frontend  | Next.js 16, React 19, Tailwind CSS 4           |
-| UI        | shadcn/ui (Radix), Lucide icons                |
-| Backend   | NestJS 12                                      |
-| Database  | PostgreSQL, Drizzle ORM (moving from Prisma 7) |
-| Contracts | Zod 4                                          |
-| Auth      | Better Auth (sessions, roles)                  |
-| Testing   | Vitest, Supertest, Playwright                  |
-| Linting   | ESLint (web), oxlint (api), Prettier           |
-| Monorepo  | npm workspaces, Turborepo                      |
+| Area      | Choice                               |
+| --------- | ------------------------------------ |
+| Language  | TypeScript (strict)                  |
+| Frontend  | Next.js 16, React 19, Tailwind CSS 4 |
+| UI        | shadcn/ui (Radix), Lucide icons      |
+| Backend   | NestJS 12                            |
+| Database  | PostgreSQL, Drizzle ORM              |
+| Contracts | Zod 4                                |
+| Auth      | Better Auth (sessions, roles)        |
+| Testing   | Vitest, Supertest, Playwright        |
+| Linting   | ESLint (web), oxlint (api), Prettier |
+| Monorepo  | npm workspaces, Turborepo            |
 
 ## Repository structure
 
@@ -82,7 +82,7 @@ stock), 8 customers (`*@demo.example.com`, password `demo-password`) with addres
 orders over the last two months. It only adds what's missing, and refuses to run with
 `NODE_ENV=production`. Run it again after pulling to pick up new demo data: products from an
 older run get their photos in place of the earlier drawn images. The photos are from Pexels
-(see `api/prisma/demo/photos/README.md`).
+(see `api/seed/demo/photos/README.md`).
 
 The local database is PostgreSQL 17 in Docker. The password is passed to the container as
 a Compose secret, not an environment variable. Stop it with `docker compose down`; add `-v`
