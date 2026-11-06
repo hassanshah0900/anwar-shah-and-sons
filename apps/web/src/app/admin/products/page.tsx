@@ -1,9 +1,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
-import { productListQuerySchema, productStatuses, type ProductListQuery } from '@repo/shared';
+import {
+  DEFAULT_PAGE_SIZE,
+  productListQuerySchema,
+  productStatuses,
+  type ProductListQuery,
+} from '@repo/shared';
 import { ProductStatusBadge } from '@/components/admin/product-status-badge';
-import { Pagination } from '@/components/shop/pagination';
+import { ListFooter } from '@/components/lists/list-footer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -47,20 +52,23 @@ async function Products({ searchParams }: { searchParams: SearchParams }) {
     status: raw.status,
     q: raw.q || undefined,
     page: raw.page,
+    pageSize: raw.pageSize,
   });
-  const query: ProductListQuery = parsed.success ? parsed.data : { page: 1, pageSize: 25 };
+  const query: ProductListQuery = parsed.success
+    ? parsed.data
+    : { page: 1, pageSize: DEFAULT_PAGE_SIZE };
 
   const [{ products, total }, store] = await Promise.all([
     getAdminProducts(query),
     getStoreConfig(),
   ]);
-  const pages = Math.max(1, Math.ceil(total / query.pageSize));
   const href = (changes: Partial<ProductListQuery>) => {
     const params = new URLSearchParams();
-    const next = { status: query.status, q: query.q, page: query.page, ...changes };
+    const next = { ...query, ...changes };
     if (next.status) params.set('status', next.status);
     if (next.q) params.set('q', next.q);
-    if (next.page && next.page > 1) params.set('page', String(next.page));
+    if (next.page > 1) params.set('page', String(next.page));
+    if (next.pageSize !== DEFAULT_PAGE_SIZE) params.set('pageSize', String(next.pageSize));
     const search = params.toString();
     return `/admin/products${search ? `?${search}` : ''}`;
   };
@@ -87,6 +95,9 @@ async function Products({ searchParams }: { searchParams: SearchParams }) {
         </nav>
         <form role="search" className="flex gap-2">
           {query.status && <input type="hidden" name="status" value={query.status} />}
+          {query.pageSize !== DEFAULT_PAGE_SIZE && (
+            <input type="hidden" name="pageSize" value={query.pageSize} />
+          )}
           <label htmlFor="product-search" className="sr-only">
             Search products
           </label>
@@ -157,14 +168,13 @@ async function Products({ searchParams }: { searchParams: SearchParams }) {
         </div>
       )}
 
-      {pages > 1 && (
-        <div className="mt-6 flex items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">
-            Page {query.page} of {pages} · {total} products
-          </p>
-          <Pagination page={query.page} pages={pages} href={(page) => href({ page })} />
-        </div>
-      )}
+      <ListFooter
+        summary={`${total} ${total === 1 ? 'product' : 'products'}`}
+        total={total}
+        page={query.page}
+        pageSize={query.pageSize}
+        href={(page) => href({ page })}
+      />
     </>
   );
 }

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { paginationQuerySchema } from './pagination.js';
 
 /**
  * Orders. An order copies product names, options and prices at the time of
@@ -154,8 +155,7 @@ export const orderListQuerySchema = z.object({
   status: orderStatusSchema.optional(),
   /** Admin only: just the orders with a refund due. */
   refundDue: z.stringbool().optional(),
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  ...paginationQuerySchema.shape,
 });
 export type OrderListQuery = z.infer<typeof orderListQuerySchema>;
 

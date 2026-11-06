@@ -1,10 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
-import { orderListQuerySchema, orderStatuses, type OrderListQuery } from '@repo/shared';
+import {
+  DEFAULT_PAGE_SIZE,
+  orderListQuerySchema,
+  orderStatuses,
+  type OrderListQuery,
+} from '@repo/shared';
 import { formatOrderDate } from '@/components/orders/order-details';
 import { OrderStatusBadge, orderStatusLabels } from '@/components/orders/order-status-badge';
-import { Pagination } from '@/components/shop/pagination';
+import { ListFooter } from '@/components/lists/list-footer';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -41,16 +46,20 @@ async function Orders({ searchParams }: Pick<PageProps<'/admin/orders'>, 'search
     status: raw.status,
     refundDue: raw.refundDue,
     page: raw.page,
+    pageSize: raw.pageSize,
   });
-  const query: OrderListQuery = parsed.success ? parsed.data : { page: 1, pageSize: 25 };
+  const query: OrderListQuery = parsed.success
+    ? parsed.data
+    : { page: 1, pageSize: DEFAULT_PAGE_SIZE };
 
   const [{ orders, total }, store] = await Promise.all([getAdminOrders(query), getStoreConfig()]);
   const href = (changes: Partial<OrderListQuery>) => {
-    const next = { status: query.status, refundDue: query.refundDue, page: query.page, ...changes };
+    const next = { ...query, ...changes };
     const params = new URLSearchParams();
     if (next.status) params.set('status', next.status);
     if (next.refundDue) params.set('refundDue', 'true');
-    if (next.page && next.page > 1) params.set('page', String(next.page));
+    if (next.page > 1) params.set('page', String(next.page));
+    if (next.pageSize !== DEFAULT_PAGE_SIZE) params.set('pageSize', String(next.pageSize));
     return `/admin/orders${params.size ? `?${params}` : ''}`;
   };
 
@@ -135,16 +144,13 @@ async function Orders({ searchParams }: Pick<PageProps<'/admin/orders'>, 'search
         </div>
       )}
 
-      <div className="mt-6 flex items-center justify-between gap-4">
-        <p className="text-sm text-muted-foreground">
-          {total} {total === 1 ? 'order' : 'orders'}
-        </p>
-        <Pagination
-          page={query.page}
-          pages={Math.ceil(total / query.pageSize)}
-          href={(page) => href({ page })}
-        />
-      </div>
+      <ListFooter
+        summary={`${total} ${total === 1 ? 'order' : 'orders'}`}
+        total={total}
+        page={query.page}
+        pageSize={query.pageSize}
+        href={(page) => href({ page })}
+      />
     </>
   );
 }

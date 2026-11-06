@@ -1,7 +1,14 @@
-import { Controller, Get } from '@nestjs/common';
-import { ADMIN_ROLE, type SessionUser, type UserList } from '@repo/shared';
+import { Controller, Get, Query } from '@nestjs/common';
+import {
+  ADMIN_ROLE,
+  userListQuerySchema,
+  type SessionUser,
+  type UserList,
+  type UserListQuery,
+} from '@repo/shared';
 import { Roles, Session, type UserSession } from '@thallesp/nestjs-better-auth';
 import type { Auth } from '../auth/auth.js';
+import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { UsersService } from './users.service.js';
 
 @Controller('users')
@@ -14,10 +21,10 @@ export class UsersController {
     return this.usersService.toSessionUser(session.user);
   }
 
-  /** All users, newest first. Admins only. */
+  /** Users, newest first, a page at a time. Admins only. */
   @Roles([ADMIN_ROLE])
   @Get()
-  list(): Promise<UserList> {
-    return this.usersService.list();
+  list(@Query(new ZodValidationPipe(userListQuerySchema)) query: UserListQuery): Promise<UserList> {
+    return this.usersService.list(query);
   }
 }

@@ -48,9 +48,11 @@ describe('UsersService', () => {
     ]);
     prisma.user.count.mockResolvedValue(1);
 
-    const result = await service.list({ take: 10_000 });
+    const result = await service.list({ page: 3, pageSize: 10 });
 
-    expect(prisma.user.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 100 }));
+    expect(prisma.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 10, skip: 20 }),
+    );
     expect(result).toEqual({
       users: [expect.objectContaining({ id: 'u1', createdAt: createdAt.toISOString() })],
       total: 1,

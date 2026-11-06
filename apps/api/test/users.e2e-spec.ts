@@ -72,5 +72,31 @@ describe('Users (e2e)', () => {
       expect(list.total).toBe(3);
       expect(list.users.map((user) => user.email)).toContain('admin@example.com');
     });
+
+    it('pages through users', async () => {
+      await signUp('first@example.com');
+      await signUp('second@example.com');
+      const cookies = await signUp('pager@example.com');
+      await prisma.user.update({ where: { email: 'pager@example.com' }, data: { role: 'admin' } });
+      const page = (query: string) =>
+        request(app.getHttpServer()).get(`/api/v1/users?${query}`).set('Cookie', cookies);
+
+      const first = userListSchema.parse((await page('pageSize=2').expect(200)).body);
+      const second = userListSchema.parse((await page('pageSize=2&page=2').expect(200)).body);
+
+      expect(first.users).toHaveLength(2);
+      expect(second.total).toBe(first.total);
+      expect(second.users.map((user) => user.id)).not.toContain(first.users[0]?.id);
+    });
+
+    it('refuses a page size above the limit', async () => {
+      const cookies = await signUp('limit@example.com');
+      await prisma.user.update({ where: { email: 'limit@example.com' }, data: { role: 'admin' } });
+
+      await request(app.getHttpServer())
+        .get('/api/v1/users?pageSize=101')
+        .set('Cookie', cookies)
+        .expect(400);
+    });
   });
 });
