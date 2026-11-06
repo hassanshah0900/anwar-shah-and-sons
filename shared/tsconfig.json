@@ -1,7 +1,5 @@
 {
-  "$schema": "https://json.schemastore.org/tsconfig",
-  "display": "Node library (ESM)",
-  "extends": "./base.json",
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2023",
     "lib": ["ES2023"],
@@ -9,6 +7,9 @@
     "moduleResolution": "nodenext",
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true
-  }
+    "sourceMap": true,
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src"]
 }

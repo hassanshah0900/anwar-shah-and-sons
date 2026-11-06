@@ -10,7 +10,7 @@ build/
 next-env.d.ts
 
 # Generated code
-apps/api/src/generated/
+api/src/generated/
 
 # Turborepo
 .turbo/
@@ -35,4 +35,4 @@ playwright-report/
 !.vscode/extensions.json
 
 # Local media storage (STORAGE_DRIVER=local)
-apps/api/uploads/
+api/uploads/

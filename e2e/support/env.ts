@@ -30,7 +30,7 @@ function databaseUrl(): string {
     }
   }
   const value = process.env['DATABASE_URL'];
-  if (!value) throw new Error('Browser tests need DATABASE_URL, or apps/api/.env.');
+  if (!value) throw new Error('Browser tests need DATABASE_URL, or api/.env.');
 
   const url = new URL(value);
   url.searchParams.set('schema', SCHEMA);
