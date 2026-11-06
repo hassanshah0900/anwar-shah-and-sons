@@ -84,6 +84,8 @@ export const productListingQuerySchema = z.object({
   option: repeated(z.string().regex(/^[a-z0-9-]+:[a-z0-9-]+$/)).default([]),
   minPrice: z.coerce.number().int().nonnegative().optional(),
   maxPrice: z.coerce.number().int().nonnegative().optional(),
+  /** Only products whose compare-at price is above their price. */
+  onSale: z.stringbool().optional(),
   sort: productSortSchema.default('newest'),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(48).default(24),

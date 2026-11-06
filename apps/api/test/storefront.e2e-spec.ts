@@ -125,6 +125,20 @@ describe('Public catalog (e2e)', () => {
     await request(app.getHttpServer()).get('/api/v1/products?sort=cheapest').expect(400);
   });
 
+  it('filters to products on sale', async () => {
+    const prisma = app.get(PrismaService);
+    await prisma.product.updateMany({
+      where: { name: 'Lawn Kurta' },
+      data: { compareAtPrice: 6490 },
+    });
+    try {
+      expect(names(await listing('?onSale=true'))).toEqual(['Lawn Kurta']);
+      expect(names(await listing('?onSale=false'))).toHaveLength(2);
+    } finally {
+      await prisma.product.updateMany({ data: { compareAtPrice: null } });
+    }
+  });
+
   it('returns facets and the price range for the products in scope', async () => {
     const result = await listing('?option=colour:ivory');
 

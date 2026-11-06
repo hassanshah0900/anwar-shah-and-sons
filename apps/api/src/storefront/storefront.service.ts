@@ -78,6 +78,7 @@ export class StorefrontService {
         ...optionFilters(query.option),
         ...(query.minPrice !== undefined ? [{ price: { gte: query.minPrice } }] : []),
         ...(query.maxPrice !== undefined ? [{ price: { lte: query.maxPrice } }] : []),
+        ...(query.onSale ? [{ compareAtPrice: { gt: this.prisma.product.fields.price } }] : []),
       ],
     };
     const orderBy: Prisma.ProductOrderByWithRelationInput[] =
