@@ -1,6 +1,6 @@
 # 0003. Prisma as the ORM
 
-- **Status**: Accepted
+- **Status**: Superseded by [0009](0009-drizzle-orm.md)
 - **Date**: 2026-11-01
 
 ## Context

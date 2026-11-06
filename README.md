@@ -11,30 +11,30 @@ monorepo, with a Next.js storefront and a NestJS REST API.
 flowchart LR
     browser([Browser]) --> web["web<br/>Next.js"]
     web -- "REST /api" --> api["api<br/>NestJS"]
-    api -- Prisma --> db[(PostgreSQL)]
+    api -- Drizzle --> db[(PostgreSQL)]
     shared["@repo/shared<br/>Zod contracts"] -.-> web
     shared -.-> api
 ```
 
 - **`web`**: Next.js (App Router) storefront. Server Components call the API from the server.
-- **`api`**: NestJS REST API. Owns the database through Prisma.
+- **`api`**: NestJS REST API. Owns the database through Drizzle ORM.
 - **`shared`**: Zod schemas and inferred types for every API contract, used by both
   apps. A breaking API change fails type checking in the web app.
 
 ## Tech stack
 
-| Area      | Choice                                   |
-| --------- | ---------------------------------------- |
-| Language  | TypeScript (strict)                      |
-| Frontend  | Next.js 16, React 19, Tailwind CSS 4     |
-| UI        | shadcn/ui (Radix), Lucide icons          |
-| Backend   | NestJS 12                                |
-| Database  | PostgreSQL, Prisma 7 (pg driver adapter) |
-| Contracts | Zod 4                                    |
-| Auth      | Better Auth (sessions, roles)            |
-| Testing   | Vitest, Supertest, Playwright            |
-| Linting   | ESLint (web), oxlint (api), Prettier     |
-| Monorepo  | npm workspaces, Turborepo                |
+| Area      | Choice                                         |
+| --------- | ---------------------------------------------- |
+| Language  | TypeScript (strict)                            |
+| Frontend  | Next.js 16, React 19, Tailwind CSS 4           |
+| UI        | shadcn/ui (Radix), Lucide icons                |
+| Backend   | NestJS 12                                      |
+| Database  | PostgreSQL, Drizzle ORM (moving from Prisma 7) |
+| Contracts | Zod 4                                          |
+| Auth      | Better Auth (sessions, roles)                  |
+| Testing   | Vitest, Supertest, Playwright                  |
+| Linting   | ESLint (web), oxlint (api), Prettier           |
+| Monorepo  | npm workspaces, Turborepo                      |
 
 ## Repository structure
 
@@ -68,7 +68,7 @@ cp api/.env.example api/.env        # use the same password in DATABASE_URL
 cp web/.env.example web/.env.local
 
 docker compose up -d                          # PostgreSQL on localhost:5432
-npm run db:deploy -w api                      # apply database migrations
+npm run db:migrate -w api                     # apply database migrations
 npm run db:seed -w api                        # create the admin from ADMIN_* in api/.env
 npm run db:seed:demo -w api                   # optional: demo catalog, customers and orders
 npm run dev
