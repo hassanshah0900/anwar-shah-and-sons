@@ -9,116 +9,92 @@ import {
   type ProductListing,
   type ProductListingQuery,
 } from '@repo/shared';
-import type { Prisma } from '../generated/prisma/client.js';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { and, asc, desc, eq, exists, gt, gte, inArray, lte, max, min, type SQL } from 'drizzle-orm';
+import type { Database } from '../db/connection.js';
+import { InjectDatabase } from '../db/database.module.js';
+import { containsInsensitive } from '../db/queries.js';
+import {
+  categories,
+  optionTypes,
+  optionValues,
+  productImages,
+  productOptions,
+  products,
+  productVariants,
+  variantOptionValues,
+} from '../db/schema/index.js';
 
 type CategoryNode = Pick<Category, 'id' | 'name' | 'slug' | 'parentId'>;
-
-const cardSelect = {
-  id: true,
-  name: true,
-  slug: true,
-  price: true,
-  compareAtPrice: true,
-  reviewCount: true,
-  ratingTotal: true,
-  images: {
-    select: { storageKey: true, alt: true },
-    orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
-    take: 1,
-  },
-  variants: {
-    select: {
-      price: true,
-      stock: true,
-      optionValues: {
-        select: {
-          optionValue: {
-            select: {
-              label: true,
-              slug: true,
-              colorHex: true,
-              position: true,
-              optionType: { select: { kind: true } },
-            },
-          },
-        },
-      },
-    },
-  },
-} satisfies Prisma.ProductSelect;
-
-type CardRow = Prisma.ProductGetPayload<{ select: typeof cardSelect }>;
 
 /** Read-only, public view of the catalog: only active products are visible. */
 @Injectable()
 export class StorefrontService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@InjectDatabase() private readonly db: Database) {}
 
   categories(): Promise<Category[]> {
-    return this.prisma.category.findMany({
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        description: true,
-        parentId: true,
-        position: true,
-      },
-      orderBy: [{ position: 'asc' }, { name: 'asc' }],
-    });
+    return this.db
+      .select({
+        id: categories.id,
+        name: categories.name,
+        slug: categories.slug,
+        description: categories.description,
+        parentId: categories.parentId,
+        position: categories.position,
+      })
+      .from(categories)
+      .orderBy(asc(categories.position), asc(categories.name));
   }
 
   async listProducts(query: ProductListingQuery): Promise<ProductListing> {
-    const scope: Prisma.ProductWhereInput = {
-      status: 'active',
-      ...(query.category && { categoryId: { in: await this.categoryScope(query.category) } }),
-      ...(query.q && { name: { contains: query.q, mode: 'insensitive' } }),
-    };
-    const where: Prisma.ProductWhereInput = {
-      ...scope,
-      AND: [
-        ...optionFilters(query.option),
-        ...(query.minPrice !== undefined ? [{ price: { gte: query.minPrice } }] : []),
-        ...(query.maxPrice !== undefined ? [{ price: { lte: query.maxPrice } }] : []),
-        ...(query.onSale ? [{ compareAtPrice: { gt: this.prisma.product.fields.price } }] : []),
-      ],
-    };
-    const orderBy: Prisma.ProductOrderByWithRelationInput[] =
+    const scope = and(
+      eq(products.status, 'active'),
+      query.category
+        ? inArray(products.categoryId, await this.categoryScope(query.category))
+        : undefined,
+      query.q ? containsInsensitive(products.name, query.q) : undefined,
+    );
+    const where = and(
+      scope,
+      ...optionFilters(this.db, query.option),
+      query.minPrice !== undefined ? gte(products.price, query.minPrice) : undefined,
+      query.maxPrice !== undefined ? lte(products.price, query.maxPrice) : undefined,
+      query.onSale ? gt(products.compareAtPrice, products.price) : undefined,
+    );
+    const orderBy =
       query.sort === 'price-asc'
-        ? [{ price: 'asc' }, { createdAt: 'desc' }]
+        ? [asc(products.price), desc(products.createdAt)]
         : query.sort === 'price-desc'
-          ? [{ price: 'desc' }, { createdAt: 'desc' }]
-          : [{ createdAt: 'desc' }];
+          ? [desc(products.price), desc(products.createdAt)]
+          : [desc(products.createdAt)];
 
-    const [rows, total, facets, price] = await Promise.all([
-      this.prisma.product.findMany({
-        where,
-        select: cardSelect,
-        orderBy,
-        take: query.pageSize,
-        skip: (query.page - 1) * query.pageSize,
-      }),
-      this.prisma.product.count({ where }),
+    const [page, total, facets, [price]] = await Promise.all([
+      this.db
+        .select({ id: products.id })
+        .from(products)
+        .where(where)
+        .orderBy(...orderBy, asc(products.id))
+        .limit(query.pageSize)
+        .offset((query.page - 1) * query.pageSize),
+      this.db.$count(products, where),
       this.facets(scope),
-      this.prisma.product.aggregate({ where: scope, _min: { price: true }, _max: { price: true } }),
+      this.db
+        .select({ min: min(products.price), max: max(products.price) })
+        .from(products)
+        .where(scope),
     ]);
 
     return {
-      products: rows.map(toCard),
+      products: await this.cards(page.map((row) => row.id)),
       total,
       facets,
-      price:
-        price._min.price === null || price._max.price === null
-          ? null
-          : { min: price._min.price, max: price._max.price },
+      price: price?.min == null || price.max == null ? null : { min: price.min, max: price.max },
     };
   }
 
   async product(slug: string): Promise<ProductDetail> {
-    const product = await this.prisma.product.findFirst({
-      where: { slug, status: 'active' },
-      select: {
+    const product = await this.db.query.products.findFirst({
+      where: and(eq(products.slug, slug), eq(products.status, 'active')),
+      columns: {
         id: true,
         name: true,
         slug: true,
@@ -128,34 +104,31 @@ export class StorefrontService {
         reviewCount: true,
         ratingTotal: true,
         categoryId: true,
+      },
+      with: {
         options: {
-          orderBy: { position: 'asc' },
-          select: {
+          columns: {},
+          orderBy: [asc(productOptions.position)],
+          with: {
             optionType: {
-              select: {
-                name: true,
-                slug: true,
-                kind: true,
+              columns: { name: true, slug: true, kind: true },
+              with: {
                 values: {
-                  select: { id: true, label: true, slug: true, colorHex: true },
-                  orderBy: [{ position: 'asc' }, { label: 'asc' }],
+                  columns: { id: true, label: true, slug: true, colorHex: true },
+                  orderBy: [asc(optionValues.position), asc(optionValues.label)],
                 },
               },
             },
           },
         },
         variants: {
-          orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
-          select: {
-            id: true,
-            price: true,
-            stock: true,
-            optionValues: { select: { optionValueId: true } },
-          },
+          columns: { id: true, price: true, stock: true },
+          orderBy: [asc(productVariants.position), asc(productVariants.createdAt)],
+          with: { optionValues: { columns: { optionValueId: true } } },
         },
         images: {
-          orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
-          select: { storageKey: true, alt: true, optionValueId: true },
+          columns: { storageKey: true, alt: true, optionValueId: true },
+          orderBy: [asc(productImages.position), asc(productImages.createdAt)],
         },
       },
     });
@@ -192,6 +165,49 @@ export class StorefrontService {
     };
   }
 
+  /** Cards for these products, in the order given. */
+  private async cards(ids: string[]): Promise<ProductCard[]> {
+    if (!ids.length) return [];
+    const rows = await this.db.query.products.findMany({
+      where: inArray(products.id, ids),
+      columns: {
+        id: true,
+        name: true,
+        slug: true,
+        price: true,
+        compareAtPrice: true,
+        reviewCount: true,
+        ratingTotal: true,
+      },
+      with: {
+        images: {
+          columns: { storageKey: true, alt: true },
+          orderBy: [asc(productImages.position), asc(productImages.createdAt)],
+          limit: 1,
+        },
+        variants: {
+          columns: { price: true, stock: true },
+          with: {
+            optionValues: {
+              columns: {},
+              with: {
+                optionValue: {
+                  columns: { label: true, slug: true, colorHex: true, position: true },
+                  with: { optionType: { columns: { kind: true } } },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    return ids.flatMap((id) => {
+      const row = byId.get(id);
+      return row ? [toCard(row)] : [];
+    });
+  }
+
   /** The category with this slug and all of its descendants. */
   private async categoryScope(slug: string): Promise<string[]> {
     const all = await this.allCategories();
@@ -222,23 +238,40 @@ export class StorefrontService {
   }
 
   private allCategories(): Promise<CategoryNode[]> {
-    return this.prisma.category.findMany({
-      select: { id: true, name: true, slug: true, parentId: true },
-    });
+    return this.db
+      .select({
+        id: categories.id,
+        name: categories.name,
+        slug: categories.slug,
+        parentId: categories.parentId,
+      })
+      .from(categories);
   }
 
   /** Option values used by variants of products in scope, grouped by option. */
-  private async facets(scope: Prisma.ProductWhereInput): Promise<Facet[]> {
-    const values = await this.prisma.optionValue.findMany({
-      where: { variants: { some: { variant: { product: scope } } } },
-      select: {
-        label: true,
-        slug: true,
-        colorHex: true,
-        optionType: { select: { name: true, slug: true, kind: true, position: true } },
-      },
-      orderBy: [{ optionType: { position: 'asc' } }, { position: 'asc' }, { label: 'asc' }],
-    });
+  private async facets(scope: SQL | undefined): Promise<Facet[]> {
+    const usedInScope = this.db
+      .select({ id: variantOptionValues.optionValueId })
+      .from(variantOptionValues)
+      .innerJoin(productVariants, eq(productVariants.id, variantOptionValues.variantId))
+      .innerJoin(products, eq(products.id, productVariants.productId))
+      .where(and(eq(variantOptionValues.optionValueId, optionValues.id), scope));
+
+    const values = await this.db
+      .select({
+        label: optionValues.label,
+        slug: optionValues.slug,
+        colorHex: optionValues.colorHex,
+        optionType: {
+          name: optionTypes.name,
+          slug: optionTypes.slug,
+          kind: optionTypes.kind,
+        },
+      })
+      .from(optionValues)
+      .innerJoin(optionTypes, eq(optionTypes.id, optionValues.optionTypeId))
+      .where(exists(usedInScope))
+      .orderBy(asc(optionTypes.position), asc(optionValues.position), asc(optionValues.label));
 
     const facets = new Map<string, Facet>();
     for (const { optionType, ...value } of values) {
@@ -256,23 +289,55 @@ export class StorefrontService {
 }
 
 /** Values of one option are alternatives; different options must all match. */
-function optionFilters(filters: string[]): Prisma.ProductWhereInput[] {
+function optionFilters(db: Database, filters: string[]): SQL[] {
   const byOption = new Map<string, string[]>();
   for (const filter of filters) {
     const [option = '', value = ''] = filter.split(':');
     byOption.set(option, [...(byOption.get(option) ?? []), value]);
   }
 
-  return [...byOption].map(([option, values]) => ({
-    variants: {
-      some: {
-        optionValues: {
-          some: { optionValue: { slug: { in: values }, optionType: { slug: option } } },
-        },
-      },
-    },
-  }));
+  return [...byOption].map(([option, values]) =>
+    exists(
+      db
+        .select({ id: productVariants.id })
+        .from(productVariants)
+        .innerJoin(variantOptionValues, eq(variantOptionValues.variantId, productVariants.id))
+        .innerJoin(optionValues, eq(optionValues.id, variantOptionValues.optionValueId))
+        .innerJoin(optionTypes, eq(optionTypes.id, optionValues.optionTypeId))
+        .where(
+          and(
+            eq(productVariants.productId, products.id),
+            inArray(optionValues.slug, values),
+            eq(optionTypes.slug, option),
+          ),
+        ),
+    ),
+  );
 }
+
+type CardRow = {
+  id: string;
+  name: string;
+  slug: string;
+  price: number;
+  compareAtPrice: number | null;
+  reviewCount: number;
+  ratingTotal: number;
+  images: { storageKey: string; alt: string }[];
+  variants: {
+    price: number | null;
+    stock: number;
+    optionValues: {
+      optionValue: {
+        label: string;
+        slug: string;
+        colorHex: string | null;
+        position: number;
+        optionType: { kind: 'text' | 'color' };
+      };
+    }[];
+  }[];
+};
 
 function toCard(row: CardRow): ProductCard {
   const prices = row.variants.map((variant) => variant.price ?? row.price);
