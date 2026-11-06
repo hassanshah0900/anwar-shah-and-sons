@@ -10,8 +10,8 @@ import { getCart } from '@/lib/api/cart';
 import { getStoreConfig } from '@/lib/api/store';
 import { requireUser } from '@/lib/auth/session';
 import { formatPrice } from '@/lib/money';
-import { CheckoutForm } from './checkout-form';
 import { Card } from '@/components/ui/card';
+import { CheckoutForm } from './checkout-form';
 
 export const metadata: Metadata = {
   title: 'Checkout',

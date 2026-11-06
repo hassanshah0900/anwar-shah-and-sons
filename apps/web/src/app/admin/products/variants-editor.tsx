@@ -26,9 +26,9 @@ import {
 } from '@/components/ui/table';
 import { formKey, formList, initialActionState } from '@/lib/forms/action-state';
 import { formatPrice, priceInputValue } from '@/lib/money';
-import { addVariant, deleteVariant, generateVariants, saveVariant } from './variant-actions';
 import { Card } from '@/components/ui/card';
 import { Empty, EmptyDescription } from '@/components/ui/empty';
+import { addVariant, deleteVariant, generateVariants, saveVariant } from './variant-actions';
 
 type EditorProps = { product: Product; optionTypes: OptionType[]; store: StoreConfig };
 

@@ -6,10 +6,10 @@ import { Swatch } from '@/components/shop/swatch';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiRequest } from '@/lib/api/server';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
 import { deleteOptionType, deleteOptionValue } from './actions';
 import { OptionTypeDialog } from './option-type-dialog';
 import { AddOptionValueForm, EditOptionValueDialog } from './option-value-form';
-import { Empty, EmptyDescription } from '@/components/ui/empty';
 
 export const metadata: Metadata = { title: 'Options' };
 

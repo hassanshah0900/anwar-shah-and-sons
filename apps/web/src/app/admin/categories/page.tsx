@@ -13,9 +13,9 @@ import {
 } from '@/components/ui/table';
 import { apiRequest } from '@/lib/api/server';
 import { flattenCategoryTree } from '@/lib/catalog/category-tree';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
 import { deleteCategory } from './actions';
 import { CategoryFormDialog } from './category-form-dialog';
-import { Empty, EmptyDescription } from '@/components/ui/empty';
 
 export const metadata: Metadata = { title: 'Categories' };
 

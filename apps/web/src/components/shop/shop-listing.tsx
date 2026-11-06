@@ -10,12 +10,12 @@ import {
   toListingQuery,
   type ListingState,
 } from '@/lib/catalog/listing-params';
+import { Empty, EmptyContent, EmptyDescription } from '@/components/ui/empty';
 import { FilterSheet } from './filter-sheet';
 import { ListingFilters } from './listing-filters';
 import { Pagination } from './pagination';
 import { ProductGrid, ProductGridSkeleton } from './product-grid';
 import { SortMenu } from './sort-menu';
-import { Empty, EmptyContent, EmptyDescription } from '@/components/ui/empty';
 
 const sortLabels: Record<ProductSort, string> = {
   newest: 'Newest',

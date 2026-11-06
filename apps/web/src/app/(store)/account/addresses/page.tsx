@@ -7,12 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getAddresses } from '@/lib/api/addresses';
 import { requireUser } from '@/lib/auth/session';
-import { makeDefaultAddress, removeAddress } from './actions';
-import { AddressDialog } from './address-dialog';
-import { MakeDefaultButton } from './make-default-button';
 import { PageBreadcrumbs } from '@/components/layout/page-breadcrumbs';
 import { Card } from '@/components/ui/card';
 import { Empty, EmptyDescription } from '@/components/ui/empty';
+import { makeDefaultAddress, removeAddress } from './actions';
+import { AddressDialog } from './address-dialog';
+import { MakeDefaultButton } from './make-default-button';
 
 export const metadata: Metadata = { title: 'Your addresses', robots: { index: false } };
 

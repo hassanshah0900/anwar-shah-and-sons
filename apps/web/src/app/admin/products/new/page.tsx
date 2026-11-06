@@ -5,9 +5,9 @@ import { categoryListSchema, optionTypeListSchema } from '@repo/shared';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiRequest } from '@/lib/api/server';
 import { getStoreConfig } from '@/lib/api/store';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
 import { createProduct } from '../actions';
 import { ProductForm } from '../product-form';
-import { Empty, EmptyDescription } from '@/components/ui/empty';
 
 export const metadata: Metadata = { title: 'New product' };
 

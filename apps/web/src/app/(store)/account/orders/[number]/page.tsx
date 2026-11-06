@@ -11,9 +11,9 @@ import { getMyOrder } from '@/lib/api/orders';
 import { ApiError } from '@/lib/api/server';
 import { getStoreConfig } from '@/lib/api/store';
 import { requireUser } from '@/lib/auth/session';
+import { PageBreadcrumbs } from '@/components/layout/page-breadcrumbs';
 import { CancelOrder } from './cancel-order';
 import { PayNow } from './pay-now';
-import { PageBreadcrumbs } from '@/components/layout/page-breadcrumbs';
 
 type Props = PageProps<'/account/orders/[number]'>;
 
