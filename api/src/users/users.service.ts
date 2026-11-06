@@ -6,11 +6,14 @@ import {
   type UserList,
   type UserListQuery,
 } from '@repo/shared';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { desc } from 'drizzle-orm';
+import type { Database } from '../db/connection.js';
+import { InjectDatabase } from '../db/database.module.js';
+import { users as usersTable } from '../db/schema/index.js';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@InjectDatabase() private readonly db: Database) {}
 
   /** Strips the session's user down to the public contract (no ban or internal fields). */
   toSessionUser(user: unknown): SessionUser {
@@ -22,22 +25,22 @@ export class UsersService {
     page = 1,
     pageSize = DEFAULT_PAGE_SIZE,
   }: Partial<UserListQuery> = {}): Promise<UserList> {
-    const [users, total] = await this.prisma.$transaction([
-      this.prisma.user.findMany({
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          emailVerified: true,
-          image: true,
-          role: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: 'desc' },
-        take: pageSize,
-        skip: (page - 1) * pageSize,
-      }),
-      this.prisma.user.count(),
+    const [users, total] = await Promise.all([
+      this.db
+        .select({
+          id: usersTable.id,
+          name: usersTable.name,
+          email: usersTable.email,
+          emailVerified: usersTable.emailVerified,
+          image: usersTable.image,
+          role: usersTable.role,
+          createdAt: usersTable.createdAt,
+        })
+        .from(usersTable)
+        .orderBy(desc(usersTable.createdAt))
+        .limit(pageSize)
+        .offset((page - 1) * pageSize),
+      this.db.$count(usersTable),
     ]);
 
     return {

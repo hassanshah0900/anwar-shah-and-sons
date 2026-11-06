@@ -1,18 +1,25 @@
 import { Test } from '@nestjs/testing';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { DATABASE } from '../db/database.module.js';
 import { UsersService } from './users.service.js';
 
 describe('UsersService', () => {
-  const prisma = {
-    $transaction: vi.fn((queries: Promise<unknown>[]) => Promise.all(queries)),
-    user: { findMany: vi.fn(), count: vi.fn() },
+  // Stands in for Drizzle's select().from().orderBy().limit().offset() chain.
+  const rows = vi.fn();
+  const limit = vi.fn();
+  const offset = vi.fn();
+  const query = {
+    from: () => query,
+    orderBy: () => query,
+    limit: (value: number) => (limit(value), query),
+    offset: (value: number) => (offset(value), rows()),
   };
+  const db = { select: () => query, $count: vi.fn() };
   let service: UsersService;
 
   beforeEach(async () => {
     vi.clearAllMocks();
     const moduleRef = await Test.createTestingModule({
-      providers: [UsersService, { provide: PrismaService, useValue: prisma }],
+      providers: [UsersService, { provide: DATABASE, useValue: db }],
     }).compile();
     service = moduleRef.get(UsersService);
   });
@@ -35,7 +42,7 @@ describe('UsersService', () => {
 
   it('caps the page size and serialises dates', async () => {
     const createdAt = new Date('2026-01-01T00:00:00.000Z');
-    prisma.user.findMany.mockResolvedValue([
+    rows.mockResolvedValue([
       {
         id: 'u1',
         name: 'Ayesha',
@@ -46,13 +53,12 @@ describe('UsersService', () => {
         createdAt,
       },
     ]);
-    prisma.user.count.mockResolvedValue(1);
+    db.$count.mockResolvedValue(1);
 
     const result = await service.list({ page: 3, pageSize: 10 });
 
-    expect(prisma.user.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ take: 10, skip: 20 }),
-    );
+    expect(limit).toHaveBeenCalledWith(10);
+    expect(offset).toHaveBeenCalledWith(20);
     expect(result).toEqual({
       users: [expect.objectContaining({ id: 'u1', createdAt: createdAt.toISOString() })],
       total: 1,

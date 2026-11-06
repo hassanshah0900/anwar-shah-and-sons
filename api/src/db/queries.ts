@@ -1,5 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { ilike, max, type SQL } from 'drizzle-orm';
+import { DrizzleQueryError } from 'drizzle-orm/errors';
+import pg from 'pg';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import type { Database } from './connection.js';
 
@@ -43,4 +45,10 @@ export async function nextPosition(
     .from(table)
     .where(where);
   return ((row?.last as number | null | undefined) ?? -1) + 1;
+}
+
+/** Whether a query failed on a unique index (e.g. two identical submissions at once). */
+export function isUniqueViolation(error: unknown): boolean {
+  const cause = error instanceof DrizzleQueryError ? error.cause : error;
+  return cause instanceof pg.DatabaseError && cause.code === '23505';
 }
