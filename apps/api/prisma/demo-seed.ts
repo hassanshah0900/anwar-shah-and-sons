@@ -30,6 +30,7 @@ import {
   kidsSizes,
   products,
 } from './demo/catalog.js';
+import { demoReviews } from './demo/reviews.js';
 
 const DAY = 86_400_000;
 const ORDER_COUNT = 60;
@@ -255,6 +256,41 @@ async function main() {
       shoppers.push({ id: user.id, email, ...person });
     }
     console.log(`Customers: ${shoppers.length} (password: ${DEMO_PASSWORD})`);
+
+    // ─── Reviews ───────────────────────────────────────────────────────────
+    // Made-up reviews, so the demo shop shows ratings. Products that already have
+    // reviews are left alone, so a re-run never doubles them up.
+    const reviewRng = random(20261106);
+    let reviewed = 0;
+    for (const spec of products) {
+      const product = await prisma.product.findUniqueOrThrow({
+        where: { slug: spec.slug },
+        select: { id: true, reviewCount: true, createdAt: true },
+      });
+      const pool = demoReviews[spec.category] ?? [];
+      if (product.reviewCount > 0 || pool.length === 0) continue;
+
+      const count = Math.min(reviewRng.int(2, 5), shoppers.length, pool.length);
+      const authors = [...shoppers].sort(() => reviewRng.next() - 0.5).slice(0, count);
+      const texts = [...pool].sort(() => reviewRng.next() - 0.5);
+      for (const [index, author] of authors.entries()) {
+        const text = texts[index]!;
+        // Some days after the product appeared, never in the future.
+        const age = Date.now() - product.createdAt.getTime();
+        await prisma.review.create({
+          data: {
+            productId: product.id,
+            userId: author.id,
+            rating: text.rating,
+            title: text.title ?? null,
+            body: text.body,
+            createdAt: new Date(product.createdAt.getTime() + reviewRng.next() * age),
+          },
+        });
+      }
+      reviewed++;
+    }
+    console.log(`Reviews: ${reviewed} products reviewed`);
 
     // ─── Orders ────────────────────────────────────────────────────────────
     const existingOrders = await prisma.order.count({
