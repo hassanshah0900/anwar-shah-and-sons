@@ -27,6 +27,7 @@ import {
 import { formKey, formList, initialActionState } from '@/lib/forms/action-state';
 import { formatPrice, priceInputValue } from '@/lib/money';
 import { addVariant, deleteVariant, generateVariants, saveVariant } from './variant-actions';
+import { Card } from '@/components/ui/card';
 
 type EditorProps = { product: Product; optionTypes: OptionType[]; store: StoreConfig };
 
@@ -240,72 +241,71 @@ function AddVariantForm({ productId, options, store }: AddVariantFormProps) {
   const chosen = formList(values, 'optionValueIds');
 
   return (
-    <form
-      key={formKey(state)}
-      action={formAction}
-      className="grid gap-4 border bg-muted/40 p-4"
-      noValidate
-    >
-      <h3 className="text-base">Add a variant</h3>
-      <input type="hidden" name="productId" value={productId} />
-      <FormError
-        message={state.status === 'error' ? (state.message ?? errors.optionValueIds ?? null) : null}
-      />
-      <div className="flex flex-wrap items-start gap-4">
-        {options.map((option) => (
-          <div key={option.id} className="grid w-40 gap-2">
-            <Label htmlFor={`new-${option.id}`}>{option.name}</Label>
-            <Select
-              name="optionValueIds"
-              defaultValue={option.values.find((value) => chosen.includes(value.id))?.id}
-            >
-              <SelectTrigger id={`new-${option.id}`} className="w-full">
-                <SelectValue placeholder="Choose" />
-              </SelectTrigger>
-              <SelectContent>
-                {option.values.map((value) => (
-                  <SelectItem key={value.id} value={value.id}>
-                    {value.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+    <Card className="bg-muted/40 p-4 text-base">
+      <form key={formKey(state)} action={formAction} className="grid gap-4" noValidate>
+        <h3 className="text-base">Add a variant</h3>
+        <input type="hidden" name="productId" value={productId} />
+        <FormError
+          message={
+            state.status === 'error' ? (state.message ?? errors.optionValueIds ?? null) : null
+          }
+        />
+        <div className="flex flex-wrap items-start gap-4">
+          {options.map((option) => (
+            <div key={option.id} className="grid w-40 gap-2">
+              <Label htmlFor={`new-${option.id}`}>{option.name}</Label>
+              <Select
+                name="optionValueIds"
+                defaultValue={option.values.find((value) => chosen.includes(value.id))?.id}
+              >
+                <SelectTrigger id={`new-${option.id}`} className="w-full">
+                  <SelectValue placeholder="Choose" />
+                </SelectTrigger>
+                <SelectContent>
+                  {option.values.map((value) => (
+                    <SelectItem key={value.id} value={value.id}>
+                      {value.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ))}
+          <div className="w-48">
+            <FormField
+              id="new-sku"
+              name="sku"
+              label="SKU"
+              defaultValue={values.sku}
+              error={errors.sku}
+            />
           </div>
-        ))}
-        <div className="w-48">
-          <FormField
-            id="new-sku"
-            name="sku"
-            label="SKU"
-            defaultValue={values.sku}
-            error={errors.sku}
-          />
+          <div className="w-32">
+            <FormField
+              id="new-price"
+              name="price"
+              label={`Price (${store.currency})`}
+              inputMode="decimal"
+              placeholder="Product price"
+              defaultValue={values.price}
+              error={errors.price}
+            />
+          </div>
+          <div className="w-24">
+            <FormField
+              id="new-stock"
+              name="stock"
+              label="Stock"
+              inputMode="numeric"
+              defaultValue={values.stock ?? '0'}
+              error={errors.stock}
+            />
+          </div>
+          <Button type="submit" disabled={pending} className="mt-7">
+            {pending ? 'Adding…' : 'Add variant'}
+          </Button>
         </div>
-        <div className="w-32">
-          <FormField
-            id="new-price"
-            name="price"
-            label={`Price (${store.currency})`}
-            inputMode="decimal"
-            placeholder="Product price"
-            defaultValue={values.price}
-            error={errors.price}
-          />
-        </div>
-        <div className="w-24">
-          <FormField
-            id="new-stock"
-            name="stock"
-            label="Stock"
-            inputMode="numeric"
-            defaultValue={values.stock ?? '0'}
-            error={errors.stock}
-          />
-        </div>
-        <Button type="submit" disabled={pending} className="mt-7">
-          {pending ? 'Adding…' : 'Add variant'}
-        </Button>
-      </div>
-    </form>
+      </form>
+    </Card>
   );
 }

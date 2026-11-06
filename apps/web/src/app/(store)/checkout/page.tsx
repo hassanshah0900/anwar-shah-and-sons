@@ -11,6 +11,7 @@ import { getStoreConfig } from '@/lib/api/store';
 import { requireUser } from '@/lib/auth/session';
 import { formatPrice } from '@/lib/money';
 import { CheckoutForm } from './checkout-form';
+import { Card } from '@/components/ui/card';
 
 export const metadata: Metadata = {
   title: 'Checkout',
@@ -66,9 +67,10 @@ async function Checkout() {
         />
       </div>
 
-      <section
+      <Card
+        role="region"
         aria-labelledby="summary-heading"
-        className="flex flex-col gap-6 rounded-md border p-6 lg:sticky lg:top-24 lg:self-start"
+        className="gap-6 p-6 text-base lg:sticky lg:top-24 lg:self-start"
       >
         <div className="flex items-baseline justify-between gap-4">
           <h2 id="summary-heading" className="font-sans text-base font-medium tracking-normal">
@@ -127,7 +129,7 @@ async function Checkout() {
             Free shipping on orders from {formatPrice(store.shipping.freeOver, store)}.
           </p>
         )}
-      </section>
+      </Card>
     </div>
   );
 }

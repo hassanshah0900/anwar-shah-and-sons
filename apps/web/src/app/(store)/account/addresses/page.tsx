@@ -11,6 +11,7 @@ import { makeDefaultAddress, removeAddress } from './actions';
 import { AddressDialog } from './address-dialog';
 import { MakeDefaultButton } from './make-default-button';
 import { PageBreadcrumbs } from '@/components/layout/page-breadcrumbs';
+import { Card } from '@/components/ui/card';
 
 export const metadata: Metadata = { title: 'Your addresses', robots: { index: false } };
 
@@ -63,7 +64,7 @@ async function Addresses() {
 
 function AddressCard({ address }: { address: Address }) {
   return (
-    <article className="flex h-full flex-col gap-4 rounded-md border p-5">
+    <Card role="article" className="h-full gap-4 p-5 text-base">
       <div className="flex items-start justify-between gap-3">
         <h2 className="font-sans text-sm font-medium tracking-normal">{address.fullName}</h2>
         {address.isDefault && <Badge>Default</Badge>}
@@ -97,6 +98,6 @@ function AddressCard({ address }: { address: Address }) {
           }
         />
       </div>
-    </article>
+    </Card>
   );
 }

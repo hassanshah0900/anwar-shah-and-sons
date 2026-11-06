@@ -19,6 +19,7 @@ import { getDashboard } from '@/lib/api/dashboard';
 import { getStoreConfig } from '@/lib/api/store';
 import { requireAdmin } from '@/lib/auth/session';
 import { formatPrice } from '@/lib/money';
+import { Card } from '@/components/ui/card';
 
 export const metadata: Metadata = { title: 'Dashboard' };
 
@@ -90,9 +91,9 @@ async function Overview() {
         />
       </section>
 
-      <section aria-label="Revenue trend" className="rounded-md border p-5">
+      <Card role="region" aria-label="Revenue trend" className="p-5 text-base">
         <RevenueChart daily={data.daily} money={money} />
-      </section>
+      </Card>
 
       <div className="grid gap-12 lg:grid-cols-2">
         <section aria-labelledby="recent-heading" className="flex flex-col gap-4">
