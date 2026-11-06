@@ -10,6 +10,7 @@ import {
   toListingQuery,
   type ListingState,
 } from '@/lib/catalog/listing-params';
+import { Empty, EmptyContent, EmptyDescription } from '@/components/ui/empty';
 import { FilterSheet } from './filter-sheet';
 import { ListingFilters } from './listing-filters';
 import { Pagination } from './pagination';
@@ -74,21 +75,27 @@ export async function ShopListing({
         </div>
 
         {listing.products.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 border border-dashed px-6 py-16 text-center">
-            <p className="text-sm text-muted-foreground">
+          <Empty className="gap-3 border px-6 py-16">
+            <EmptyDescription>
               {filterCount > 0 || state.q
                 ? 'No products match your selection.'
                 : 'Nothing here yet. Check back soon.'}
-            </p>
+            </EmptyDescription>
             {filterCount > 0 && (
-              <Link
-                href={listingHref(pathname, state, { options: [], min: undefined, max: undefined })}
-                className="text-sm underline underline-offset-4"
-              >
-                Clear filters
-              </Link>
+              <EmptyContent>
+                <Link
+                  href={listingHref(pathname, state, {
+                    options: [],
+                    min: undefined,
+                    max: undefined,
+                  })}
+                  className="text-sm underline underline-offset-4"
+                >
+                  Clear filters
+                </Link>
+              </EmptyContent>
             )}
-          </div>
+          </Empty>
         ) : (
           <ProductGrid products={listing.products} store={store} />
         )}

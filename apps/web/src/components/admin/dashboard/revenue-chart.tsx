@@ -1,4 +1,14 @@
 import { fromMinorUnits, type Dashboard } from '@repo/shared';
+import { ChevronDownIcon } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { formatTick, niceMax } from '@/lib/charts/scale';
 import { formatPrice } from '@/lib/money';
 import { cn } from '@/lib/utils';
@@ -112,29 +122,35 @@ export function RevenueChart({ daily, money }: { daily: Day[]; money: Money }) {
         )}
       </div>
 
-      <details className="text-sm">
-        <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+      <Collapsible className="text-sm">
+        <CollapsibleTrigger className="group flex items-center gap-1 text-muted-foreground hover:text-foreground">
           Show as a table
-        </summary>
-        <table className="mt-3 w-full text-left tabular-nums">
-          <thead className="text-muted-foreground">
-            <tr className="border-b">
-              <th className="py-2 font-normal">Day</th>
-              <th className="py-2 text-right font-normal">Orders</th>
-              <th className="py-2 text-right font-normal">Revenue</th>
-            </tr>
-          </thead>
-          <tbody>
-            {[...daily].reverse().map((day) => (
-              <tr key={day.date} className="border-b last:border-b-0">
-                <td className="py-1.5">{dayLabel(day.date, money.locale)}</td>
-                <td className="py-1.5 text-right">{day.orders}</td>
-                <td className="py-1.5 text-right">{formatPrice(day.revenue, money)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </details>
+          <ChevronDownIcon
+            aria-hidden
+            className="size-4 transition-transform group-data-[state=open]:rotate-180"
+          />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <Table className="mt-3 tabular-nums">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Day</TableHead>
+                <TableHead className="text-right">Orders</TableHead>
+                <TableHead className="text-right">Revenue</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {[...daily].reverse().map((day) => (
+                <TableRow key={day.date}>
+                  <TableCell>{dayLabel(day.date, money.locale)}</TableCell>
+                  <TableCell className="text-right">{day.orders}</TableCell>
+                  <TableCell className="text-right">{formatPrice(day.revenue, money)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CollapsibleContent>
+      </Collapsible>
     </figure>
   );
 }

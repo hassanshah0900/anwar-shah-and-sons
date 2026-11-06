@@ -1,3 +1,5 @@
+import { Label } from '@/components/ui/label';
+
 type ColorFieldProps = {
   name: string;
   /** Defaults to `name`; set it when several forms share a page. */
@@ -13,9 +15,7 @@ export function ColorField({ name, id = name, label, defaultValue, error }: Colo
 
   return (
     <div className="grid gap-2">
-      <label htmlFor={id} className="text-sm font-medium">
-        {label}
-      </label>
+      <Label htmlFor={id}>{label}</Label>
       <input
         id={id}
         name={name}

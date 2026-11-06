@@ -5,6 +5,7 @@ import { RevenueChart } from '@/components/admin/dashboard/revenue-chart';
 import { StatTile } from '@/components/admin/dashboard/stat-tile';
 import { formatOrderDate } from '@/components/orders/order-details';
 import { OrderStatusBadge } from '@/components/orders/order-status-badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -18,6 +19,8 @@ import { getDashboard } from '@/lib/api/dashboard';
 import { getStoreConfig } from '@/lib/api/store';
 import { requireAdmin } from '@/lib/auth/session';
 import { formatPrice } from '@/lib/money';
+import { Card } from '@/components/ui/card';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
 
 export const metadata: Metadata = { title: 'Dashboard' };
 
@@ -41,16 +44,15 @@ async function Overview() {
   return (
     <div className="mt-8 flex flex-col gap-12">
       {data.refundsDue > 0 && (
-        <p
-          role="alert"
-          className="rounded-md border border-destructive p-4 text-sm text-destructive"
-        >
-          {plural(data.refundsDue, 'refund')} failed and {data.refundsDue === 1 ? 'needs' : 'need'}{' '}
-          another try.{' '}
-          <Link href="/admin/orders?refundDue=true" className="underline underline-offset-4">
-            View {data.refundsDue === 1 ? 'it' : 'them'}
-          </Link>
-        </p>
+        <Alert variant="destructive" className="border-destructive p-4">
+          <AlertDescription>
+            {plural(data.refundsDue, 'refund')} failed and{' '}
+            {data.refundsDue === 1 ? 'needs' : 'need'} another try.{' '}
+            <Link href="/admin/orders?refundDue=true" className="underline underline-offset-4">
+              View {data.refundsDue === 1 ? 'it' : 'them'}
+            </Link>
+          </AlertDescription>
+        </Alert>
       )}
       <section
         aria-label="Key figures"
@@ -90,9 +92,9 @@ async function Overview() {
         />
       </section>
 
-      <section aria-label="Revenue trend" className="rounded-md border p-5">
+      <Card role="region" aria-label="Revenue trend" className="p-5 text-base">
         <RevenueChart daily={data.daily} money={money} />
-      </section>
+      </Card>
 
       <div className="grid gap-12 lg:grid-cols-2">
         <section aria-labelledby="recent-heading" className="flex flex-col gap-4">
@@ -105,9 +107,9 @@ async function Overview() {
             </Link>
           </div>
           {data.recentOrders.length === 0 ? (
-            <p className="border border-dashed p-6 text-center text-sm text-muted-foreground">
-              No orders yet.
-            </p>
+            <Empty className="border p-6">
+              <EmptyDescription>No orders yet.</EmptyDescription>
+            </Empty>
           ) : (
             <div className="border">
               <Table>
@@ -153,9 +155,9 @@ async function Overview() {
             Low stock
           </h2>
           {data.lowStock.length === 0 ? (
-            <p className="border border-dashed p-6 text-center text-sm text-muted-foreground">
-              Every variant is well stocked.
-            </p>
+            <Empty className="border p-6">
+              <EmptyDescription>Every variant is well stocked.</EmptyDescription>
+            </Empty>
           ) : (
             <div className="border">
               <Table>

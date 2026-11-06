@@ -2,12 +2,13 @@
 
 import type { ProductDetail } from '@repo/shared';
 import type { ValueState } from '@/lib/catalog/variant-selection';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { cn } from '@/lib/utils';
 
 type Option = ProductDetail['options'][number];
 
 /**
- * One option as a group of radio buttons: swatches for colours, labelled boxes
+ * One option as a single-choice toggle group: swatches for colours, labelled boxes
  * otherwise. Sold-out and unavailable values stay choosable (picking one clears
  * choices it can't combine with) but are crossed out.
  */
@@ -31,7 +32,14 @@ export function OptionPicker({
         <span className="text-muted-foreground">{option.name}:</span>{' '}
         {selected?.label ?? <span className="text-muted-foreground">Select</span>}
       </legend>
-      <div className="flex flex-wrap gap-2">
+      <ToggleGroup
+        type="single"
+        value={selectedId ?? ''}
+        // Clicking the chosen value again would clear it; keep the choice instead.
+        onValueChange={(valueId) => valueId && onChoose(valueId)}
+        spacing={2}
+        className="flex-wrap"
+      >
         {option.values.map((value) => {
           const state = stateOf(value.id);
           const checked = value.id === selectedId;
@@ -43,26 +51,21 @@ export function OptionPicker({
                 : '';
 
           return (
-            <label
+            <ToggleGroupItem
               key={value.id}
+              value={value.id}
               title={value.label}
+              aria-label={`${value.label}${note}`}
               className={cn(
-                'relative flex cursor-pointer items-center justify-center rounded-sm border text-sm transition-colors has-focus-visible:ring-3 has-focus-visible:ring-ring/50',
+                'relative rounded-sm border font-normal hover:bg-transparent data-[state=on]:bg-transparent',
                 isColor ? 'size-10 p-1' : 'h-10 min-w-12 px-3',
                 checked ? 'border-foreground' : 'hover:border-foreground',
-                checked && !isColor && 'bg-primary text-primary-foreground',
+                checked &&
+                  !isColor &&
+                  'bg-primary text-primary-foreground hover:bg-primary data-[state=on]:bg-primary',
                 state !== 'available' && !checked && 'text-muted-foreground',
               )}
             >
-              <input
-                type="radio"
-                name={option.slug}
-                value={value.id}
-                checked={checked}
-                onChange={() => onChoose(value.id)}
-                className="sr-only"
-                aria-label={`${value.label}${note}`}
-              />
               {isColor ? (
                 <span
                   aria-hidden
@@ -82,10 +85,10 @@ export function OptionPicker({
                   <span className="absolute top-1/2 left-1/2 h-px w-[141%] -translate-x-1/2 -translate-y-1/2 -rotate-45 bg-muted-foreground" />
                 </span>
               )}
-            </label>
+            </ToggleGroupItem>
           );
         })}
-      </div>
+      </ToggleGroup>
     </fieldset>
   );
 }

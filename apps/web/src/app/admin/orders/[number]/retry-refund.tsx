@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react';
 import { FormError } from '@/components/forms/form-error';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { initialActionState } from '@/lib/forms/action-state';
 import { retryRefundAction } from '../actions';
@@ -11,14 +12,11 @@ export function RetryRefund({ number }: { number: number }) {
   const [state, formAction, pending] = useActionState(retryRefundAction, initialActionState);
 
   return (
-    <section
-      role="alert"
-      className="flex flex-col gap-3 rounded-md border border-destructive p-4 text-sm"
-    >
-      <p className="text-destructive">
+    <Alert variant="destructive" className="gap-3 border-destructive p-4">
+      <AlertDescription>
         This order was cancelled but its refund failed, so the customer hasn&apos;t got their money
         back.
-      </p>
+      </AlertDescription>
       <FormError message={state.status === 'error' ? (state.message ?? null) : null} />
       <form action={formAction}>
         <input type="hidden" name="number" value={number} />
@@ -26,6 +24,6 @@ export function RetryRefund({ number }: { number: number }) {
           {pending ? 'Refunding…' : 'Retry refund'}
         </Button>
       </form>
-    </section>
+    </Alert>
   );
 }

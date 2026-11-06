@@ -10,6 +10,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 const themes = [
   { value: 'light', label: 'Light', icon: SunIcon },
@@ -47,20 +48,25 @@ export function ThemeSwitcher() {
   const { theme, setTheme } = useTheme();
 
   return (
-    <div role="radiogroup" aria-label="Theme" className="flex gap-1 rounded-md border p-1">
+    <ToggleGroup
+      type="single"
+      value={theme ?? ''}
+      // Clicking the chosen theme again would clear it; keep it instead.
+      onValueChange={(value) => value && setTheme(value)}
+      aria-label="Theme"
+      spacing={1}
+      className="w-full rounded-md border p-1"
+    >
       {themes.map(({ value, label, icon: Icon }) => (
-        <button
+        <ToggleGroupItem
           key={value}
-          type="button"
-          role="radio"
-          aria-checked={theme === value}
-          onClick={() => setTheme(value)}
-          className="flex flex-1 items-center justify-center gap-2 rounded-sm px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground aria-checked:bg-muted aria-checked:text-foreground"
+          value={value}
+          className="h-auto flex-1 gap-2 rounded-sm px-3 py-2 font-normal text-muted-foreground hover:bg-transparent data-[state=on]:bg-muted data-[state=on]:text-foreground"
         >
-          <Icon className="size-4" aria-hidden />
+          <Icon aria-hidden />
           {label}
-        </button>
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   );
 }

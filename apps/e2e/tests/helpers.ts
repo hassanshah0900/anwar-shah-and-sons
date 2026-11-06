@@ -42,7 +42,7 @@ export async function addToBag(page: Page) {
   await expect(groups.first()).toBeVisible();
   for (const group of await groups.all()) {
     // Unavailable values say why in their label, in brackets.
-    await group.locator('input[type=radio]:not([aria-label*="("])').first().check({ force: true });
+    await group.locator('[role=radio]:not([aria-label*="("])').first().click();
   }
   await main(page)
     .getByRole('button', { name: /add to bag/i })

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Card } from '@/components/ui/card';
 
 /** One headline number. With `href`, the whole tile links to the matching list. */
 export function StatTile({
@@ -19,13 +20,13 @@ export function StatTile({
       {detail && <span className="text-xs text-muted-foreground">{detail}</span>}
     </>
   );
-  const className = 'flex h-full flex-col gap-1 rounded-md border p-4';
+  const className = 'h-full gap-1 p-4 text-base';
 
   return href ? (
-    <Link href={href} className={`${className} transition-colors hover:bg-muted/50`}>
-      {body}
+    <Link href={href} className="block h-full rounded-md">
+      <Card className={`${className} transition-colors hover:bg-muted/50`}>{body}</Card>
     </Link>
   ) : (
-    <div className={className}>{body}</div>
+    <Card className={className}>{body}</Card>
   );
 }

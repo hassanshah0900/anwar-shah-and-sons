@@ -26,6 +26,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { formKey, initialActionState } from '@/lib/forms/action-state';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { deleteImage, moveImage, updateImage, uploadImage } from './image-actions';
 
 const ALL = 'all';
@@ -92,73 +94,75 @@ function ImageCard({ productId, image, index, previous, next, values }: ImageCar
   const name = image.alt || `Image ${index + 1}`;
 
   return (
-    <li className="grid content-start gap-3 border p-3">
-      <div className="relative aspect-3/4 overflow-hidden bg-muted">
-        <Image
-          src={`/media/${image.key}`}
-          alt={image.alt}
-          fill
-          sizes="(min-width: 1024px) 20vw, (min-width: 640px) 30vw, 45vw"
-          className="object-cover"
-        />
-        {index === 0 && <Badge className="absolute top-2 left-2">Main</Badge>}
-      </div>
-
-      <form key={formKey(state)} action={formAction} className="grid gap-2">
-        <input type="hidden" name="productId" value={productId} />
-        <input type="hidden" name="imageId" value={image.id} />
-        <FormField
-          id={`alt-${image.id}`}
-          name="alt"
-          label="Alt text"
-          placeholder="Describe the photo"
-          defaultValue={state.values?.alt ?? image.alt}
-          error={state.fieldErrors?.alt}
-        />
-        {values.length > 0 && (
-          <ShowsForSelect
-            id={`shows-${image.id}`}
-            values={values}
-            defaultValue={state.values?.optionValueId ?? image.optionValueId}
+    <li>
+      <Card className="grid h-full content-start gap-3 p-3 text-base">
+        <div className="relative aspect-3/4 overflow-hidden bg-muted">
+          <Image
+            src={`/media/${image.key}`}
+            alt={image.alt}
+            fill
+            sizes="(min-width: 1024px) 20vw, (min-width: 640px) 30vw, 45vw"
+            className="object-cover"
           />
-        )}
-        {state.status === 'error' && state.message && (
-          <p role="alert" className="text-sm text-destructive">
-            {state.message}
-          </p>
-        )}
-        <Button type="submit" variant="outline" size="sm" disabled={pending}>
-          {pending ? 'Saving…' : state.status === 'success' ? 'Saved' : 'Save'}
-        </Button>
-      </form>
-
-      <div className="flex items-center gap-1">
-        <MoveButton
-          productId={productId}
-          image={image}
-          neighbour={previous}
-          label={`Move ${name} earlier`}
-        >
-          <ArrowLeftIcon />
-        </MoveButton>
-        <MoveButton
-          productId={productId}
-          image={image}
-          neighbour={next}
-          label={`Move ${name} later`}
-        >
-          <ArrowRightIcon />
-        </MoveButton>
-        <div className="ml-auto">
-          <ConfirmDeleteDialog
-            title="Delete this image?"
-            description="The file is removed from storage. This can't be undone."
-            action={deleteImage}
-            fields={{ productId, imageId: image.id }}
-            label={`Delete ${name}`}
-          />
+          {index === 0 && <Badge className="absolute top-2 left-2">Main</Badge>}
         </div>
-      </div>
+
+        <form key={formKey(state)} action={formAction} className="grid gap-2">
+          <input type="hidden" name="productId" value={productId} />
+          <input type="hidden" name="imageId" value={image.id} />
+          <FormField
+            id={`alt-${image.id}`}
+            name="alt"
+            label="Alt text"
+            placeholder="Describe the photo"
+            defaultValue={state.values?.alt ?? image.alt}
+            error={state.fieldErrors?.alt}
+          />
+          {values.length > 0 && (
+            <ShowsForSelect
+              id={`shows-${image.id}`}
+              values={values}
+              defaultValue={state.values?.optionValueId ?? image.optionValueId}
+            />
+          )}
+          {state.status === 'error' && state.message && (
+            <p role="alert" className="text-sm text-destructive">
+              {state.message}
+            </p>
+          )}
+          <Button type="submit" variant="outline" size="sm" disabled={pending}>
+            {pending ? 'Saving…' : state.status === 'success' ? 'Saved' : 'Save'}
+          </Button>
+        </form>
+
+        <div className="flex items-center gap-1">
+          <MoveButton
+            productId={productId}
+            image={image}
+            neighbour={previous}
+            label={`Move ${name} earlier`}
+          >
+            <ArrowLeftIcon />
+          </MoveButton>
+          <MoveButton
+            productId={productId}
+            image={image}
+            neighbour={next}
+            label={`Move ${name} later`}
+          >
+            <ArrowRightIcon />
+          </MoveButton>
+          <div className="ml-auto">
+            <ConfirmDeleteDialog
+              title="Delete this image?"
+              description="The file is removed from storage. This can't be undone."
+              action={deleteImage}
+              fields={{ productId, imageId: image.id }}
+              label={`Delete ${name}`}
+            />
+          </div>
+        </div>
+      </Card>
     </li>
   );
 }
@@ -242,55 +246,56 @@ function UploadForm({ productId, values }: { productId: string; values: OptionVa
   }
 
   return (
-    <form
-      key={formKey(state)}
-      action={formAction}
-      onSubmit={(event) => clientError && event.preventDefault()}
-      className="grid gap-4 border bg-muted/40 p-4"
-      noValidate
-    >
-      <h3 className="text-base">Upload an image</h3>
-      <input type="hidden" name="productId" value={productId} />
-      <FormError message={state.status === 'error' ? (state.message ?? null) : null} />
-      {state.status === 'success' && state.message && (
-        <p role="status" className="text-sm text-muted-foreground">
-          {state.message}
-        </p>
-      )}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="grid gap-2">
-          <Label htmlFor="image-file">Image (JPEG, PNG, WebP or AVIF, up to 5 MB)</Label>
-          <input
-            id="image-file"
-            name="file"
-            type="file"
-            accept={imageContentTypes.join(',')}
-            onChange={checkFile}
-            aria-invalid={fileError ? true : undefined}
-            aria-describedby={fileError ? 'image-file-error' : undefined}
-            className="text-sm file:mr-3 file:rounded-md file:border file:border-input file:bg-background file:px-3 file:py-1.5 file:text-sm file:font-medium"
+    <Card className="bg-muted/40 p-4 text-base">
+      <form
+        key={formKey(state)}
+        action={formAction}
+        onSubmit={(event) => clientError && event.preventDefault()}
+        className="grid gap-4"
+        noValidate
+      >
+        <h3 className="text-base">Upload an image</h3>
+        <input type="hidden" name="productId" value={productId} />
+        <FormError message={state.status === 'error' ? (state.message ?? null) : null} />
+        {state.status === 'success' && state.message && (
+          <p role="status" className="text-sm text-muted-foreground">
+            {state.message}
+          </p>
+        )}
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-2">
+            <Label htmlFor="image-file">Image (JPEG, PNG, WebP or AVIF, up to 5 MB)</Label>
+            <Input
+              id="image-file"
+              name="file"
+              type="file"
+              accept={imageContentTypes.join(',')}
+              onChange={checkFile}
+              aria-invalid={fileError ? true : undefined}
+              aria-describedby={fileError ? 'image-file-error' : undefined}
+            />
+            {fileError && (
+              <p id="image-file-error" className="text-sm text-destructive">
+                {fileError}
+              </p>
+            )}
+          </div>
+          <FormField
+            id="image-alt"
+            name="alt"
+            label="Alt text"
+            placeholder="e.g. Front view, black"
+            defaultValue={state.values?.alt}
+            error={state.fieldErrors?.alt}
           />
-          {fileError && (
-            <p id="image-file-error" className="text-sm text-destructive">
-              {fileError}
-            </p>
-          )}
+          {values.length > 0 && <ShowsForSelect id="image-shows-for" values={values} />}
         </div>
-        <FormField
-          id="image-alt"
-          name="alt"
-          label="Alt text"
-          placeholder="e.g. Front view, black"
-          defaultValue={state.values?.alt}
-          error={state.fieldErrors?.alt}
-        />
-        {values.length > 0 && <ShowsForSelect id="image-shows-for" values={values} />}
-      </div>
-      <div>
-        <Button type="submit" disabled={pending}>
-          {pending ? 'Uploading…' : 'Upload'}
-        </Button>
-      </div>
-    </form>
+        <div>
+          <Button type="submit" disabled={pending}>
+            {pending ? 'Uploading…' : 'Upload'}
+          </Button>
+        </div>
+      </form>
+    </Card>
   );
 }

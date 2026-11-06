@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { getCart } from '@/lib/api/cart';
 import { getStoreConfig } from '@/lib/api/store';
 import { formatPrice } from '@/lib/money';
+import { Card } from '@/components/ui/card';
 
 export const metadata: Metadata = {
   title: 'Your bag',
@@ -52,9 +53,10 @@ async function CartContents() {
         ))}
       </ul>
 
-      <section
+      <Card
+        role="region"
         aria-labelledby="summary-heading"
-        className="flex flex-col gap-5 rounded-md border p-6 lg:sticky lg:top-24 lg:self-start"
+        className="gap-5 p-6 text-base lg:sticky lg:top-24 lg:self-start"
       >
         <h2 id="summary-heading" className="font-sans text-base font-medium tracking-normal">
           Order summary
@@ -91,7 +93,7 @@ async function CartContents() {
         >
           Continue shopping
         </Link>
-      </section>
+      </Card>
     </div>
   );
 }

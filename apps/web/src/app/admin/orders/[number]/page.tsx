@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { isRefundDue } from '@repo/shared';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { formatOrderDate, OrderDetails } from '@/components/orders/order-details';
@@ -10,6 +9,7 @@ import { getAdminOrder } from '@/lib/api/orders';
 import { ApiError } from '@/lib/api/server';
 import { getStoreConfig } from '@/lib/api/store';
 import { requireAdmin } from '@/lib/auth/session';
+import { PageBreadcrumbs } from '@/components/layout/page-breadcrumbs';
 import { RetryRefund } from './retry-refund';
 import { OrderStatusActions } from './status-actions';
 
@@ -46,11 +46,7 @@ async function OrderView({ params }: Pick<Props, 'params'>) {
   return (
     <div className="flex flex-col gap-10">
       <header className="flex flex-col gap-4">
-        <nav aria-label="Breadcrumb" className="text-xs text-muted-foreground">
-          <Link href="/admin/orders" className="hover:text-foreground">
-            Orders
-          </Link>
-        </nav>
+        <PageBreadcrumbs crumbs={[{ name: 'Orders', href: '/admin/orders' }]} />
         <div className="flex flex-wrap items-center gap-4">
           <h1 className="text-4xl">Order #{order.number}</h1>
           <OrderStatusBadge order={order} />

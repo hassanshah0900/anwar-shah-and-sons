@@ -19,6 +19,7 @@ import { getStoreConfig } from '@/lib/api/store';
 import { requireAdmin } from '@/lib/auth/session';
 import { formatPrice } from '@/lib/money';
 import { cn } from '@/lib/utils';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
 
 export const metadata: Metadata = { title: 'Orders' };
 
@@ -80,13 +81,15 @@ async function Orders({ searchParams }: Pick<PageProps<'/admin/orders'>, 'search
       )}
 
       {orders.length === 0 ? (
-        <p className="mt-6 border border-dashed p-10 text-center text-sm text-muted-foreground">
-          {query.refundDue
-            ? 'No refunds are due.'
-            : query.status
-              ? `No ${query.status} orders.`
-              : 'No orders yet.'}
-        </p>
+        <Empty className="mt-6 border p-10">
+          <EmptyDescription>
+            {query.refundDue
+              ? 'No refunds are due.'
+              : query.status
+                ? `No ${query.status} orders.`
+                : 'No orders yet.'}
+          </EmptyDescription>
+        </Empty>
       ) : (
         <div className="mt-6 border">
           <Table>

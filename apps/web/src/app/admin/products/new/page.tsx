@@ -5,6 +5,7 @@ import { categoryListSchema, optionTypeListSchema } from '@repo/shared';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiRequest } from '@/lib/api/server';
 import { getStoreConfig } from '@/lib/api/store';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
 import { createProduct } from '../actions';
 import { ProductForm } from '../product-form';
 
@@ -33,13 +34,15 @@ async function NewProductForm() {
 
   if (categories.length === 0) {
     return (
-      <p className="max-w-xl border border-dashed p-8 text-sm text-muted-foreground">
-        Products belong to a category.{' '}
-        <Link href="/admin/categories" className="text-foreground underline underline-offset-4">
-          Create a category
-        </Link>{' '}
-        first.
-      </p>
+      <Empty className="max-w-xl items-start border p-8 text-left">
+        <EmptyDescription>
+          Products belong to a category.{' '}
+          <Link href="/admin/categories" className="text-foreground underline underline-offset-4">
+            Create a category
+          </Link>{' '}
+          first.
+        </EmptyDescription>
+      </Empty>
     );
   }
 

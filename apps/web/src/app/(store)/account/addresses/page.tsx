@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { Suspense } from 'react';
 import { MAX_ADDRESSES, type Address } from '@repo/shared';
 import { ConfirmDeleteDialog } from '@/components/admin/confirm-delete-dialog';
@@ -8,6 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getAddresses } from '@/lib/api/addresses';
 import { requireUser } from '@/lib/auth/session';
+import { PageBreadcrumbs } from '@/components/layout/page-breadcrumbs';
+import { Card } from '@/components/ui/card';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
 import { makeDefaultAddress, removeAddress } from './actions';
 import { AddressDialog } from './address-dialog';
 import { MakeDefaultButton } from './make-default-button';
@@ -17,11 +19,7 @@ export const metadata: Metadata = { title: 'Your addresses', robots: { index: fa
 export default function AddressesPage() {
   return (
     <main className="page-container py-16">
-      <nav aria-label="Breadcrumb" className="text-xs text-muted-foreground">
-        <Link href="/account" className="hover:text-foreground">
-          Your account
-        </Link>
-      </nav>
+      <PageBreadcrumbs crumbs={[{ name: 'Your account', href: '/account' }]} />
       <h1 className="mt-3 text-5xl">Your addresses</h1>
       <p className="mt-3 text-muted-foreground">Your default address fills in checkout.</p>
       <Suspense fallback={<Skeleton className="mt-10 h-48 w-full" />}>
@@ -49,9 +47,11 @@ async function Addresses() {
       </div>
 
       {addresses.length === 0 ? (
-        <p className="border border-dashed p-10 text-center text-sm text-muted-foreground">
-          No saved addresses yet. You can also save one when you check out.
-        </p>
+        <Empty className="border p-10">
+          <EmptyDescription>
+            No saved addresses yet. You can also save one when you check out.
+          </EmptyDescription>
+        </Empty>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {addresses.map((address) => (
@@ -67,7 +67,7 @@ async function Addresses() {
 
 function AddressCard({ address }: { address: Address }) {
   return (
-    <article className="flex h-full flex-col gap-4 rounded-md border p-5">
+    <Card role="article" className="h-full gap-4 p-5 text-base">
       <div className="flex items-start justify-between gap-3">
         <h2 className="font-sans text-sm font-medium tracking-normal">{address.fullName}</h2>
         {address.isDefault && <Badge>Default</Badge>}
@@ -101,6 +101,6 @@ function AddressCard({ address }: { address: Address }) {
           }
         />
       </div>
-    </article>
+    </Card>
   );
 }

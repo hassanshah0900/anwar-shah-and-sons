@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import { productListQuerySchema, productStatuses, type ProductListQuery } from '@repo/shared';
 import { ProductStatusBadge } from '@/components/admin/product-status-badge';
+import { Pagination } from '@/components/shop/pagination';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -18,6 +19,7 @@ import { getAdminProducts } from '@/lib/api/products';
 import { getStoreConfig } from '@/lib/api/store';
 import { formatPrice } from '@/lib/money';
 import { cn } from '@/lib/utils';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
 
 export const metadata: Metadata = { title: 'Products' };
 
@@ -103,9 +105,11 @@ async function Products({ searchParams }: { searchParams: SearchParams }) {
       </div>
 
       {products.length === 0 ? (
-        <p className="mt-8 border border-dashed p-10 text-center text-sm text-muted-foreground">
-          {query.q || query.status ? 'No products match.' : 'No products yet.'}
-        </p>
+        <Empty className="mt-8 border p-10">
+          <EmptyDescription>
+            {query.q || query.status ? 'No products match.' : 'No products yet.'}
+          </EmptyDescription>
+        </Empty>
       ) : (
         <div className="mt-6 border">
           <Table>
@@ -154,23 +158,12 @@ async function Products({ searchParams }: { searchParams: SearchParams }) {
       )}
 
       {pages > 1 && (
-        <nav aria-label="Pagination" className="mt-6 flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">
+        <div className="mt-6 flex items-center justify-between gap-4">
+          <p className="text-sm text-muted-foreground">
             Page {query.page} of {pages} · {total} products
-          </span>
-          <div className="flex gap-2">
-            {query.page > 1 && (
-              <Button variant="outline" size="sm" asChild>
-                <Link href={href({ page: query.page - 1 })}>Previous</Link>
-              </Button>
-            )}
-            {query.page < pages && (
-              <Button variant="outline" size="sm" asChild>
-                <Link href={href({ page: query.page + 1 })}>Next</Link>
-              </Button>
-            )}
-          </div>
-        </nav>
+          </p>
+          <Pagination page={query.page} pages={pages} href={(page) => href({ page })} />
+        </div>
       )}
     </>
   );

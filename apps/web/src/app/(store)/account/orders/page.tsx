@@ -6,10 +6,19 @@ import { OrderStatusBadge } from '@/components/orders/order-status-badge';
 import { Pagination } from '@/components/shop/pagination';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { getMyOrders } from '@/lib/api/orders';
 import { getStoreConfig } from '@/lib/api/store';
 import { requireUser } from '@/lib/auth/session';
 import { formatPrice } from '@/lib/money';
+import { PageBreadcrumbs } from '@/components/layout/page-breadcrumbs';
 
 export const metadata: Metadata = {
   title: 'Your orders',
@@ -21,11 +30,7 @@ const PAGE_SIZE = 20;
 export default function OrdersPage({ searchParams }: PageProps<'/account/orders'>) {
   return (
     <main className="page-container py-16">
-      <nav aria-label="Breadcrumb" className="text-xs text-muted-foreground">
-        <Link href="/account" className="hover:text-foreground">
-          Your account
-        </Link>
-      </nav>
+      <PageBreadcrumbs crumbs={[{ name: 'Your account', href: '/account' }]} />
       <h1 className="mt-3 text-5xl">Your orders</h1>
       <Suspense fallback={<Skeleton className="mt-10 h-64 w-full" />}>
         <Orders searchParams={searchParams} />
@@ -56,28 +61,41 @@ async function Orders({ searchParams }: Pick<PageProps<'/account/orders'>, 'sear
 
   return (
     <div className="mt-10 flex flex-col gap-8">
-      <ul className="divide-y border-y">
-        {orders.map((order) => (
-          <li key={order.number}>
-            <Link
-              href={`/account/orders/${order.number}`}
-              className="grid grid-cols-2 items-center gap-x-4 gap-y-2 py-5 transition-colors hover:bg-muted/50 sm:grid-cols-[8rem_1fr_auto_8rem] sm:px-2"
-            >
-              <span className="font-medium">Order #{order.number}</span>
-              <span className="text-right text-sm text-muted-foreground sm:text-left">
-                {formatOrderDate(order.createdAt, store)} · {order.itemCount}{' '}
-                {order.itemCount === 1 ? 'item' : 'items'}
-              </span>
-              <span>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Order</TableHead>
+            <TableHead>Date</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="text-right">Items</TableHead>
+            <TableHead className="text-right">Total</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {orders.map((order) => (
+            <TableRow key={order.number}>
+              <TableCell className="font-medium">
+                <Link
+                  href={`/account/orders/${order.number}`}
+                  className="underline-offset-4 hover:underline"
+                >
+                  Order #{order.number}
+                </Link>
+              </TableCell>
+              <TableCell className="text-muted-foreground">
+                {formatOrderDate(order.createdAt, store)}
+              </TableCell>
+              <TableCell>
                 <OrderStatusBadge order={order} />
-              </span>
-              <span className="text-right text-sm tabular-nums">
+              </TableCell>
+              <TableCell className="text-right tabular-nums">{order.itemCount}</TableCell>
+              <TableCell className="text-right tabular-nums">
                 {formatPrice(order.total, store)}
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
       <Pagination
         page={page}
         pages={Math.ceil(total / PAGE_SIZE)}
