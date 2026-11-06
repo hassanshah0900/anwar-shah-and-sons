@@ -117,6 +117,20 @@ describe('Admin product variants (e2e)', () => {
     await api.patch(variants(`/${target.id}`), { stock: -1 }).expect(400);
   });
 
+  it('counts variants and adds up their stock in the product list', async () => {
+    const list = (await api.get('/products').expect(200)).body;
+    const totalStock = product.variants.reduce((sum, variant) => sum + variant.stock, 0);
+
+    expect(totalStock).toBeGreaterThan(0);
+    expect(list.products).toEqual([
+      expect.objectContaining({
+        id: product.id,
+        variantCount: product.variants.length,
+        totalStock,
+      }),
+    ]);
+  });
+
   it("locks the product's options once it has variants", async () => {
     await api.patch(`/products/${product.id}`, { optionTypeIds: [] }).expect(409);
   });
