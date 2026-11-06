@@ -86,6 +86,7 @@ export async function ShopListing({
                 <Link
                   href={listingHref(pathname, state, {
                     options: [],
+                    sale: false,
                     min: undefined,
                     max: undefined,
                   })}

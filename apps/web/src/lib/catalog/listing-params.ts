@@ -14,6 +14,8 @@ export type SearchParams = Record<string, string | string[] | undefined>;
 export type ListingState = {
   q?: string;
   options: string[];
+  /** Only products with a reduced price. */
+  sale: boolean;
   min?: number;
   max?: number;
   sort: ProductSort;
@@ -40,6 +42,7 @@ export function readListingState(params: SearchParams): ListingState {
   return {
     q: first(params.q)?.trim().slice(0, 100) || undefined,
     options: [...new Set(all(params.option).filter((value) => OPTION_PATTERN.test(value)))].sort(),
+    sale: ['1', 'true'].includes(first(params.sale) ?? ''),
     min: amount(first(params.min)),
     max: amount(first(params.max)),
     sort: productSorts.find((sort) => sort === first(params.sort)) ?? 'newest',
@@ -57,6 +60,7 @@ export function toListingQuery(
     category,
     q: state.q,
     option: state.options,
+    onSale: state.sale || undefined,
     minPrice: state.min === undefined ? undefined : toMinorUnits(state.min, currency),
     maxPrice: state.max === undefined ? undefined : toMinorUnits(state.max, currency),
     sort: state.sort,
@@ -78,6 +82,7 @@ export function listingHref(
   const params = new URLSearchParams();
   if (next.q) params.set('q', next.q);
   for (const option of next.options) params.append('option', option);
+  if (next.sale) params.set('sale', '1');
   if (next.min !== undefined) params.set('min', String(next.min));
   if (next.max !== undefined) params.set('max', String(next.max));
   if (next.sort !== 'newest') params.set('sort', next.sort);
@@ -94,7 +99,11 @@ export function toggleOption(options: string[], option: string): string[] {
 }
 
 export function activeFilterCount(state: ListingState): number {
-  return state.options.length + (state.min !== undefined || state.max !== undefined ? 1 : 0);
+  return (
+    state.options.length +
+    (state.sale ? 1 : 0) +
+    (state.min !== undefined || state.max !== undefined ? 1 : 0)
+  );
 }
 
 /**
