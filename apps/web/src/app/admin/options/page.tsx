@@ -9,6 +9,7 @@ import { apiRequest } from '@/lib/api/server';
 import { deleteOptionType, deleteOptionValue } from './actions';
 import { OptionTypeDialog } from './option-type-dialog';
 import { AddOptionValueForm, EditOptionValueDialog } from './option-value-form';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
 
 export const metadata: Metadata = { title: 'Options' };
 
@@ -36,9 +37,9 @@ async function OptionTypes() {
 
   if (optionTypes.length === 0) {
     return (
-      <p className="mt-10 border border-dashed p-10 text-center text-sm text-muted-foreground">
-        No options yet. Start with Size and Colour.
-      </p>
+      <Empty className="mt-10 border p-10">
+        <EmptyDescription>No options yet. Start with Size and Colour.</EmptyDescription>
+      </Empty>
     );
   }
 

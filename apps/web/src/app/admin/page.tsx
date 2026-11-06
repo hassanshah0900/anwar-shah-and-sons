@@ -20,6 +20,7 @@ import { getStoreConfig } from '@/lib/api/store';
 import { requireAdmin } from '@/lib/auth/session';
 import { formatPrice } from '@/lib/money';
 import { Card } from '@/components/ui/card';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
 
 export const metadata: Metadata = { title: 'Dashboard' };
 
@@ -106,9 +107,9 @@ async function Overview() {
             </Link>
           </div>
           {data.recentOrders.length === 0 ? (
-            <p className="border border-dashed p-6 text-center text-sm text-muted-foreground">
-              No orders yet.
-            </p>
+            <Empty className="border p-6">
+              <EmptyDescription>No orders yet.</EmptyDescription>
+            </Empty>
           ) : (
             <div className="border">
               <Table>
@@ -154,9 +155,9 @@ async function Overview() {
             Low stock
           </h2>
           {data.lowStock.length === 0 ? (
-            <p className="border border-dashed p-6 text-center text-sm text-muted-foreground">
-              Every variant is well stocked.
-            </p>
+            <Empty className="border p-6">
+              <EmptyDescription>Every variant is well stocked.</EmptyDescription>
+            </Empty>
           ) : (
             <div className="border">
               <Table>

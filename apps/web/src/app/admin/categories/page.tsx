@@ -15,6 +15,7 @@ import { apiRequest } from '@/lib/api/server';
 import { flattenCategoryTree } from '@/lib/catalog/category-tree';
 import { deleteCategory } from './actions';
 import { CategoryFormDialog } from './category-form-dialog';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
 
 export const metadata: Metadata = { title: 'Categories' };
 
@@ -46,9 +47,11 @@ async function Categories() {
       </div>
 
       {tree.length === 0 ? (
-        <p className="mt-10 border border-dashed p-10 text-center text-sm text-muted-foreground">
-          No categories yet. Create the first one, such as Women, Men or Kids.
-        </p>
+        <Empty className="mt-10 border p-10">
+          <EmptyDescription>
+            No categories yet. Create the first one, such as Women, Men or Kids.
+          </EmptyDescription>
+        </Empty>
       ) : (
         <div className="mt-8 border">
           <Table>

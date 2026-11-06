@@ -12,6 +12,7 @@ import { AddressDialog } from './address-dialog';
 import { MakeDefaultButton } from './make-default-button';
 import { PageBreadcrumbs } from '@/components/layout/page-breadcrumbs';
 import { Card } from '@/components/ui/card';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
 
 export const metadata: Metadata = { title: 'Your addresses', robots: { index: false } };
 
@@ -46,9 +47,11 @@ async function Addresses() {
       </div>
 
       {addresses.length === 0 ? (
-        <p className="border border-dashed p-10 text-center text-sm text-muted-foreground">
-          No saved addresses yet. You can also save one when you check out.
-        </p>
+        <Empty className="border p-10">
+          <EmptyDescription>
+            No saved addresses yet. You can also save one when you check out.
+          </EmptyDescription>
+        </Empty>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {addresses.map((address) => (

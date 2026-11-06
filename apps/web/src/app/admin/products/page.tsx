@@ -19,6 +19,7 @@ import { getAdminProducts } from '@/lib/api/products';
 import { getStoreConfig } from '@/lib/api/store';
 import { formatPrice } from '@/lib/money';
 import { cn } from '@/lib/utils';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
 
 export const metadata: Metadata = { title: 'Products' };
 
@@ -104,9 +105,11 @@ async function Products({ searchParams }: { searchParams: SearchParams }) {
       </div>
 
       {products.length === 0 ? (
-        <p className="mt-8 border border-dashed p-10 text-center text-sm text-muted-foreground">
-          {query.q || query.status ? 'No products match.' : 'No products yet.'}
-        </p>
+        <Empty className="mt-8 border p-10">
+          <EmptyDescription>
+            {query.q || query.status ? 'No products match.' : 'No products yet.'}
+          </EmptyDescription>
+        </Empty>
       ) : (
         <div className="mt-6 border">
           <Table>

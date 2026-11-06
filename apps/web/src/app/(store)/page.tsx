@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { siteConfig } from '@/config/site';
 import { getCategories, getProductListing } from '@/lib/api/catalog';
 import { getStoreConfig } from '@/lib/api/store';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
 
 const NEW_ARRIVALS = 8;
 
@@ -119,9 +120,9 @@ async function NewArrivals() {
 
   if (listing.products.length === 0) {
     return (
-      <p className="border border-dashed px-6 py-16 text-center text-sm text-muted-foreground">
-        New pieces are on their way. Check back soon.
-      </p>
+      <Empty className="border px-6 py-16">
+        <EmptyDescription>New pieces are on their way. Check back soon.</EmptyDescription>
+      </Empty>
     );
   }
 

@@ -28,6 +28,7 @@ import { formKey, formList, initialActionState } from '@/lib/forms/action-state'
 import { formatPrice, priceInputValue } from '@/lib/money';
 import { addVariant, deleteVariant, generateVariants, saveVariant } from './variant-actions';
 import { Card } from '@/components/ui/card';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
 
 type EditorProps = { product: Product; optionTypes: OptionType[]; store: StoreConfig };
 
@@ -60,9 +61,9 @@ export function VariantsEditor({ product, optionTypes, store }: EditorProps) {
       </div>
 
       {product.variants.length === 0 ? (
-        <p className="border border-dashed p-8 text-center text-sm text-muted-foreground">
-          No variants yet.
-        </p>
+        <Empty className="border p-8">
+          <EmptyDescription>No variants yet.</EmptyDescription>
+        </Empty>
       ) : (
         <div className="overflow-x-auto border">
           <Table>
