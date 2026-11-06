@@ -1,6 +1,6 @@
 # api
 
-NestJS REST API for Anwar Shah & Sons. See the [root README](../../README.md) for the overall setup.
+NestJS REST API for Anwar Shah & Sons. See the [root README](../README.md) for the overall setup.
 
 ## Configuration
 
@@ -33,7 +33,7 @@ Copy `.env.example` to `.env`. Every variable is validated at startup by
 
 With `STORAGE_DRIVER=s3` the API needs `s3:PutObject`, `s3:GetObject` and `s3:DeleteObject` on
 `products/*` in the bucket. Credentials come from the AWS default chain (e.g. the ECS task
-role). See [ADR 0007](../../docs/adr/0007-media-storage.md).
+role). See [ADR 0007](../docs/adr/0007-media-storage.md).
 
 ## Routes
 
@@ -72,7 +72,7 @@ role). See [ADR 0007](../../docs/adr/0007-media-storage.md).
 Every route requires a session unless it is marked `@AllowAnonymous()`, and every write
 must come from the web app's origin (CSRF). Request bodies are validated with the shared
 Zod schemas. See
-[ADR 0005](../../docs/adr/0005-authentication-with-better-auth.md).
+[ADR 0005](../docs/adr/0005-authentication-with-better-auth.md).
 
 ## Cart
 

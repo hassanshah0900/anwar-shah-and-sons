@@ -101,6 +101,6 @@ jobs:
         if: failure()
         with:
           name: browser-test-results
-          path: apps/e2e/test-results
+          path: e2e/test-results
           retention-days: 7
           if-no-files-found: ignore

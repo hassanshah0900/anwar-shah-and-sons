@@ -17,7 +17,7 @@ everything on its own ports (3310, 4310, 4311). Your development data isn't touc
 `support/fake-stripe.ts` stands in for Stripe, so no keys or network are needed. The API uses the
 real Stripe SDK against it (`STRIPE_API_URL`, refused in production), and webhooks are signed the
 way Stripe signs them. That checks request formats, signatures and the amount conversion, but not
-Stripe's own behaviour, so try real test keys before going live (see `apps/api/README.md`).
+Stripe's own behaviour, so try real test keys before going live (see `api/README.md`).
 
 ## In CI
 

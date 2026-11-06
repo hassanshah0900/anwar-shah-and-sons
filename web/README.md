@@ -1,6 +1,6 @@
 # web
 
-Next.js storefront for Anwar Shah & Sons. See the [root README](../../README.md) for the overall setup.
+Next.js storefront for Anwar Shah & Sons. See the [root README](../README.md) for the overall setup.
 
 ## Configuration
 
@@ -117,7 +117,7 @@ through `src/lib/api/server.ts`, which forwards the visitor's cookie and origin.
 
 Monochrome tokens, a 4px maximum radius and borders over shadows, built on shadcn/ui. The
 rules and their enforcement are described in
-[ADR 0004](../../docs/adr/0004-monochrome-design-system.md).
+[ADR 0004](../docs/adr/0004-monochrome-design-system.md).
 
 - **Tokens:** `src/app/globals.css`. Tailwind's default palette is removed, so use semantic
   classes (`bg-background`, `text-muted-foreground`, `border-border`).

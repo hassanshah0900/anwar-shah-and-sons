@@ -16,9 +16,9 @@ flowchart LR
     shared -.-> api
 ```
 
-- **`apps/web`**: Next.js (App Router) storefront. Server Components call the API from the server.
-- **`apps/api`**: NestJS REST API. Owns the database through Prisma.
-- **`packages/shared`**: Zod schemas and inferred types for every API contract, used by both
+- **`web`**: Next.js (App Router) storefront. Server Components call the API from the server.
+- **`api`**: NestJS REST API. Owns the database through Prisma.
+- **`shared`**: Zod schemas and inferred types for every API contract, used by both
   apps. A breaking API change fails type checking in the web app.
 
 ## Tech stack
@@ -39,15 +39,17 @@ flowchart LR
 ## Repository structure
 
 ```
-apps/
-  api/            NestJS API
-  web/            Next.js storefront
-packages/
-  shared/         API contracts (Zod schemas + types)
-  tsconfig/       shared TypeScript configs
-docs/
-  adr/            architecture decision records
+web/                Next.js storefront
+api/                NestJS API
+shared/             API contracts (Zod schemas + types), used by web and api
+e2e/                Playwright browser tests (run web + api together)
+docs/adr/           architecture decision records
+tsconfig.base.json  TypeScript settings every project extends
+turbo.json          Turborepo tasks (build order + caching)
 ```
+
+Each top-level project folder is an [npm workspace](https://docs.npmjs.com/cli/using-npm/workspaces)
+with its own `package.json`. Run a script in one of them with `-w`, e.g. `npm run dev -w web`.
 
 ## Getting started
 
@@ -62,12 +64,12 @@ docs/
 npm install
 
 cp .env.example .env                          # choose a POSTGRES_PASSWORD
-cp apps/api/.env.example apps/api/.env        # use the same password in DATABASE_URL
-cp apps/web/.env.example apps/web/.env.local
+cp api/.env.example api/.env        # use the same password in DATABASE_URL
+cp web/.env.example web/.env.local
 
 docker compose up -d                          # PostgreSQL on localhost:5432
 npm run db:deploy -w api                      # apply database migrations
-npm run db:seed -w api                        # create the admin from ADMIN_* in apps/api/.env
+npm run db:seed -w api                        # create the admin from ADMIN_* in api/.env
 npm run db:seed:demo -w api                   # optional: demo catalog, customers and orders
 npm run dev
 ```
@@ -80,7 +82,7 @@ stock), 8 customers (`*@demo.example.com`, password `demo-password`) with addres
 orders over the last two months. It only adds what's missing, and refuses to run with
 `NODE_ENV=production`. Run it again after pulling to pick up new demo data: products from an
 older run get their photos in place of the earlier drawn images. The photos are from Pexels
-(see `apps/api/prisma/demo/photos/README.md`).
+(see `api/prisma/demo/photos/README.md`).
 
 The local database is PostgreSQL 17 in Docker. The password is passed to the container as
 a Compose secret, not an environment variable. Stop it with `docker compose down`; add `-v`
@@ -97,16 +99,16 @@ repository.
 
 Run from the repository root. Turborepo runs each task in every workspace that defines it.
 
-| Command                | Description                                        |
-| ---------------------- | -------------------------------------------------- |
-| `npm run dev`          | Start all apps in watch mode                       |
-| `npm run build`        | Build all packages and apps                        |
-| `npm run lint`         | Lint all workspaces                                |
-| `npm run typecheck`    | Type-check all workspaces                          |
-| `npm test`             | Run unit tests                                     |
-| `npm run test:browser` | Run browser tests (needs Postgres; see `apps/e2e`) |
-| `npm run format`       | Format the repo with Prettier                      |
-| `npm run format:check` | Check formatting without fixes                     |
+| Command                | Description                                   |
+| ---------------------- | --------------------------------------------- |
+| `npm run dev`          | Start all apps in watch mode                  |
+| `npm run build`        | Build all packages and apps                   |
+| `npm run lint`         | Lint all workspaces                           |
+| `npm run typecheck`    | Type-check all workspaces                     |
+| `npm test`             | Run unit tests                                |
+| `npm run test:browser` | Run browser tests (needs Postgres; see `e2e`) |
+| `npm run format`       | Format the repo with Prettier                 |
+| `npm run format:check` | Check formatting without fixes                |
 
 App-specific commands (database migrations, e2e tests) are in each app's README.
 
