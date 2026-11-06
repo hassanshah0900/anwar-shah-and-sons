@@ -75,10 +75,12 @@ npm run dev
 Sign in at http://localhost:3000/sign-in with the admin account to reach `/admin`, or
 create a customer account at `/sign-up`.
 
-The demo seed adds 18 products across Women, Men and Kids (with generated photos, sizes,
-colours and stock), 8 customers (`*@demo.example.com`, password `demo-password`) with
-addresses, and 60 orders over the last two months. It only adds what's missing, never
-deletes, and refuses to run with `NODE_ENV=production`.
+The demo seed adds 18 products across Women, Men and Kids (with photos, sizes, colours and
+stock), 8 customers (`*@demo.example.com`, password `demo-password`) with addresses, and 60
+orders over the last two months. It only adds what's missing, and refuses to run with
+`NODE_ENV=production`. Run it again after pulling to pick up new demo data: products from an
+older run get their photos in place of the earlier drawn images. The photos are from Pexels
+(see `apps/api/prisma/demo/photos/README.md`).
 
 The local database is PostgreSQL 17 in Docker. The password is passed to the container as
 a Compose secret, not an environment variable. Stop it with `docker compose down`; add `-v`
