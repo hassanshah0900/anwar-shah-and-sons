@@ -8,6 +8,7 @@ export * from './money.js';
 export * from './orders.js';
 export * from './pagination.js';
 export * from './products.js';
+export * from './reviews.js';
 export * from './slug.js';
 export * from './store.js';
 export * from './storefront.js';

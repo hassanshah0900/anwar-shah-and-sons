@@ -14,6 +14,7 @@ import { MailModule } from './mail/mail.module.js';
 import { MediaModule } from './media/media.module.js';
 import { OrdersModule } from './orders/orders.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { ReviewsModule } from './reviews/reviews.module.js';
 import { StorageModule } from './storage/storage.module.js';
 import { StoreModule } from './store/store.module.js';
 import { StorefrontModule } from './storefront/storefront.module.js';
@@ -34,6 +35,7 @@ import { UsersModule } from './users/users.module.js';
     HealthModule,
     MediaModule,
     OrdersModule,
+    ReviewsModule,
     StoreModule,
     StorefrontModule,
     UsersModule,

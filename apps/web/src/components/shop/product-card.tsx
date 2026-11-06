@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { ProductCard as ProductCardData, StoreConfig } from '@repo/shared';
+import { RatingSummary } from '@/components/reviews/stars';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatPrice } from '@/lib/money';
 import { Swatch } from './swatch';
@@ -59,6 +60,7 @@ export function ProductCard({
             </s>
           )}
         </p>
+        <RatingSummary rating={product.rating} className="text-xs" />
         {product.colors.length > 1 && (
           <p className="flex items-center gap-1.5">
             {product.colors

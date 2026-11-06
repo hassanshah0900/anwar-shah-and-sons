@@ -34,6 +34,7 @@ model User {
   cart      Cart?
   orders    Order[]
   addresses Address[]
+  reviews   Review[]
 
   @@map("users")
 }
@@ -173,6 +174,9 @@ model Product {
   status         ProductStatus @default(draft)
   price          Int
   compareAtPrice Int?          @map("compare_at_price")
+  /// Kept in step with the product's reviews, so listings can show ratings without counting.
+  reviewCount    Int           @default(0) @map("review_count")
+  ratingTotal    Int           @default(0) @map("rating_total")
   createdAt      DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")
 
@@ -181,6 +185,7 @@ model Product {
   variants   ProductVariant[]
   images     ProductImage[]
   orderItems OrderItem[]
+  reviews    Review[]
 
   @@index([status, categoryId])
   @@map("products")
@@ -401,4 +406,24 @@ model Address {
 
   @@index([userId])
   @@map("addresses")
+}
+
+/// A customer's rating of a product they bought, one per customer and product.
+model Review {
+  id        String   @id @default(cuid(2))
+  productId String   @map("product_id")
+  userId    String   @map("user_id")
+  /// 1 to 5 stars (checked by the database).
+  rating    Int
+  title     String?
+  body      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, userId])
+  @@index([productId, createdAt])
+  @@index([rating, createdAt])
+  @@map("reviews")
 }

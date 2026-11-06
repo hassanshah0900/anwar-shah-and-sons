@@ -37,32 +37,37 @@ role). See [ADR 0007](../../docs/adr/0007-media-storage.md).
 
 ## Routes
 
-| Route                                         | Description                                                                                                              |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `GET /api/health`                             | Health check: `200` when all dependencies are up, else `503` (public)                                                    |
-| `/api/auth/*`                                 | Better Auth: sign-up, sign-in, sign-out, session (public)                                                                |
-| `GET /api/v1/users/me`                        | The signed-in user                                                                                                       |
-| `GET /api/v1/users`                           | Users, newest first, by `page` and `pageSize` (default 25, at most 100; admin only)                                      |
-| `GET /api/v1/store`                           | Store currency and locale (public)                                                                                       |
-| `GET /api/v1/categories`                      | Category tree (public)                                                                                                   |
-| `GET /api/v1/products`                        | Active products: `category`, `q`, repeated `option=<option>:<value>`, `minPrice`, `maxPrice`, `sort`, `page` (public)    |
-| `GET /api/v1/products/:slug`                  | Product page data with stock levels, not counts (public)                                                                 |
-| `GET /api/v1/cart`                            | The visitor's cart, with live prices and stock levels (public)                                                           |
-| `POST /api/v1/cart/items`                     | Add `{ variantId, quantity }`; a guest's first add returns a new cart token (public)                                     |
-| `PATCH /api/v1/cart/items/:variantId`         | Set `{ quantity }`; `0` removes the line (public)                                                                        |
-| `DELETE /api/v1/cart/items/:variantId`        | Remove a line (public)                                                                                                   |
-| `POST /api/v1/checkout`                       | Place an order from the signed-in customer's cart (`address`, `expectedTotal`, `notes`)                                  |
-| `GET /api/v1/orders`                          | The customer's orders (`status`, `page`)                                                                                 |
-| `GET /api/v1/orders/:number`                  | One of the customer's orders                                                                                             |
-| `/api/v1/addresses`                           | The customer's address book: list, add, `PATCH` (fields sent only), delete; one default, up to 10                        |
-| `GET /api/v1/admin/dashboard`                 | Today and the last 30 days (orders, revenue, daily figures), orders to confirm or ship, low stock, recent orders (admin) |
-| `/api/v1/admin/orders`                        | All orders: list (`status`, `page`), get, `PATCH { status }` (admin)                                                     |
-| `/api/v1/admin/categories`                    | Category tree: list, create, update, delete (admin)                                                                      |
-| `/api/v1/admin/option-types`                  | Product options and their values (admin)                                                                                 |
-| `/api/v1/admin/products`                      | Products: list (filter, search, paginate), create, update, delete (admin)                                                |
-| `/api/v1/admin/products/:id/variants`         | Variants: add, update, delete, `POST /generate` all combinations (admin)                                                 |
-| `/api/v1/admin/products/:id/images`           | Images: multipart upload (`file`, `alt`, `optionValueId`), update, delete (admin)                                        |
-| `GET /api/v1/media/products/:productId/:file` | Uploaded images, cached forever (public)                                                                                 |
+| Route                                            | Description                                                                                                                     |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/health`                                | Health check: `200` when all dependencies are up, else `503` (public)                                                           |
+| `/api/auth/*`                                    | Better Auth: sign-up, sign-in, sign-out, session (public)                                                                       |
+| `GET /api/v1/users/me`                           | The signed-in user                                                                                                              |
+| `GET /api/v1/users`                              | Users, newest first, by `page` and `pageSize` (default 25, at most 100; admin only)                                             |
+| `GET /api/v1/store`                              | Store currency and locale (public)                                                                                              |
+| `GET /api/v1/categories`                         | Category tree (public)                                                                                                          |
+| `GET /api/v1/products`                           | Active products: `category`, `q`, repeated `option=<option>:<value>`, `minPrice`, `maxPrice`, `onSale`, `sort`, `page` (public) |
+| `GET /api/v1/products/:slug`                     | Product page data with stock levels, not counts (public)                                                                        |
+| `GET /api/v1/products/:slug/reviews`             | A page of reviews (`page`, `pageSize`) with the rating spread (public)                                                          |
+| `GET /api/v1/products/:slug/reviews/eligibility` | Whether the signed-in customer may review the product                                                                           |
+| `POST /api/v1/products/:slug/reviews`            | Review a product from a delivered order, once per customer                                                                      |
+| `GET /api/v1/reviews/highlights`                 | Recent four- and five-star reviews, one per product, `limit` up to 12 (public)                                                  |
+| `DELETE /api/v1/admin/reviews/:id`               | Take a review down (admin only)                                                                                                 |
+| `GET /api/v1/cart`                               | The visitor's cart, with live prices and stock levels (public)                                                                  |
+| `POST /api/v1/cart/items`                        | Add `{ variantId, quantity }`; a guest's first add returns a new cart token (public)                                            |
+| `PATCH /api/v1/cart/items/:variantId`            | Set `{ quantity }`; `0` removes the line (public)                                                                               |
+| `DELETE /api/v1/cart/items/:variantId`           | Remove a line (public)                                                                                                          |
+| `POST /api/v1/checkout`                          | Place an order from the signed-in customer's cart (`address`, `expectedTotal`, `notes`)                                         |
+| `GET /api/v1/orders`                             | The customer's orders (`status`, `page`)                                                                                        |
+| `GET /api/v1/orders/:number`                     | One of the customer's orders                                                                                                    |
+| `/api/v1/addresses`                              | The customer's address book: list, add, `PATCH` (fields sent only), delete; one default, up to 10                               |
+| `GET /api/v1/admin/dashboard`                    | Today and the last 30 days (orders, revenue, daily figures), orders to confirm or ship, low stock, recent orders (admin)        |
+| `/api/v1/admin/orders`                           | All orders: list (`status`, `page`), get, `PATCH { status }` (admin)                                                            |
+| `/api/v1/admin/categories`                       | Category tree: list, create, update, delete (admin)                                                                             |
+| `/api/v1/admin/option-types`                     | Product options and their values (admin)                                                                                        |
+| `/api/v1/admin/products`                         | Products: list (filter, search, paginate), create, update, delete (admin)                                                       |
+| `/api/v1/admin/products/:id/variants`            | Variants: add, update, delete, `POST /generate` all combinations (admin)                                                        |
+| `/api/v1/admin/products/:id/images`              | Images: multipart upload (`file`, `alt`, `optionValueId`), update, delete (admin)                                               |
+| `GET /api/v1/media/products/:productId/:file`    | Uploaded images, cached forever (public)                                                                                        |
 
 Every route requires a session unless it is marked `@AllowAnonymous()`, and every write
 must come from the web app's origin (CSRF). Request bodies are validated with the shared

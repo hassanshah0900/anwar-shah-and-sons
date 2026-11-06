@@ -5,6 +5,7 @@ import { ArrowRightIcon } from 'lucide-react';
 import { Benefits } from '@/components/home/benefits';
 import { CategoryTiles, CategoryTilesSkeleton } from '@/components/home/category-tiles';
 import { PhotoFeature } from '@/components/home/photo-feature';
+import { ReviewHighlights } from '@/components/home/review-highlights';
 import { ProductGrid, ProductGridSkeleton } from '@/components/shop/product-grid';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyDescription } from '@/components/ui/empty';
@@ -80,6 +81,10 @@ export default function HomePage() {
 
       <Suspense fallback={null}>
         <OnSale />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <ReviewHighlights />
       </Suspense>
 
       <section className="page-container pb-16">

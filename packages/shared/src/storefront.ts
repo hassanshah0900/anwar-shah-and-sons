@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { optionKindSchema } from './catalog.js';
+import { ratingSummarySchema } from './reviews.js';
 import { slugSchema } from './slug.js';
 
 /**
@@ -42,6 +43,7 @@ export const productCardSchema = z.object({
   /** Colour choices, for swatches on the card. */
   colors: z.array(swatchSchema),
   inStock: z.boolean(),
+  rating: ratingSummarySchema,
 });
 export type ProductCard = z.infer<typeof productCardSchema>;
 
@@ -101,6 +103,7 @@ export const productDetailSchema = z.object({
   description: z.string().nullable(),
   price: moneySchema,
   compareAtPrice: moneySchema.nullable(),
+  rating: ratingSummarySchema,
   /** From the top-level category down to the product's own. */
   breadcrumbs: z.array(z.object({ name: z.string(), slug: slugSchema })),
   /** Each option with only the values some variant uses, in display order. */

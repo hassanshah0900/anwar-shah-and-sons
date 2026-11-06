@@ -18,7 +18,10 @@ import { ApiError } from './server';
  * Public catalog reads. They send no cookies, since the endpoints are the same
  * for every visitor, and run at request time so builds never need the API.
  */
-async function publicRequest<T extends z.ZodType>(path: string, schema: T): Promise<z.output<T>> {
+export async function publicRequest<T extends z.ZodType>(
+  path: string,
+  schema: T,
+): Promise<z.output<T>> {
   await connection();
 
   const { API_URL } = getServerEnv();

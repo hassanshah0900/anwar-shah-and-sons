@@ -16,6 +16,7 @@ const product: ProductDetail = {
   description: 'Soft lawn.',
   price: 4990,
   compareAtPrice: null,
+  rating: { average: null, count: 0 },
   breadcrumbs: [],
   options: [],
   variants: [
@@ -49,6 +50,16 @@ describe('productJsonLd', () => {
       '@type': 'Offer',
       price: '49.90',
       availability: 'https://schema.org/OutOfStock',
+    });
+  });
+
+  it('includes the rating only once there are reviews', () => {
+    expect(productJsonLd(product, store)).not.toHaveProperty('aggregateRating');
+    const reviewed = { ...product, rating: { average: 4.5, count: 8 } };
+    expect(productJsonLd(reviewed, store).aggregateRating).toEqual({
+      '@type': 'AggregateRating',
+      ratingValue: 4.5,
+      reviewCount: 8,
     });
   });
 });
