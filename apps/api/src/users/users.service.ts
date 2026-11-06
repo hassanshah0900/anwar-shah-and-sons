@@ -1,8 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { sessionUserSchema, type SessionUser, type UserList } from '@repo/shared';
+import {
+  DEFAULT_PAGE_SIZE,
+  sessionUserSchema,
+  type SessionUser,
+  type UserList,
+  type UserListQuery,
+} from '@repo/shared';
 import { PrismaService } from '../prisma/prisma.service.js';
-
-const MAX_PAGE_SIZE = 100;
 
 @Injectable()
 export class UsersService {
@@ -13,7 +17,11 @@ export class UsersService {
     return sessionUserSchema.parse(user);
   }
 
-  async list({ take = 50, skip = 0 } = {}): Promise<UserList> {
+  /** One page of users, newest first. The query is validated by the controller. */
+  async list({
+    page = 1,
+    pageSize = DEFAULT_PAGE_SIZE,
+  }: Partial<UserListQuery> = {}): Promise<UserList> {
     const [users, total] = await this.prisma.$transaction([
       this.prisma.user.findMany({
         select: {
@@ -26,8 +34,8 @@ export class UsersService {
           createdAt: true,
         },
         orderBy: { createdAt: 'desc' },
-        take: Math.min(take, MAX_PAGE_SIZE),
-        skip,
+        take: pageSize,
+        skip: (page - 1) * pageSize,
       }),
       this.prisma.user.count(),
     ]);
