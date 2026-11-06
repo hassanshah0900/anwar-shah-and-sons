@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
+import { DEFAULT_PAGE_SIZE, userListQuerySchema, type UserListQuery } from '@repo/shared';
+import { ListFooter } from '@/components/lists/list-footer';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -17,27 +19,35 @@ const dateFormat = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium' });
 
 export const metadata: Metadata = { title: 'Customers' };
 
-export default function CustomersPage() {
+export default function CustomersPage({ searchParams }: PageProps<'/admin/customers'>) {
   return (
     <main className="page-container py-12">
       <h1 className="text-4xl">Customers</h1>
       <Suspense fallback={<UsersTableSkeleton />}>
-        <UsersTable />
+        <UsersTable searchParams={searchParams} />
       </Suspense>
     </main>
   );
 }
 
-async function UsersTable() {
+async function UsersTable({ searchParams }: Pick<PageProps<'/admin/customers'>, 'searchParams'>) {
   await requireAdmin('/admin/customers');
-  const { users, total } = await getUsers();
+  const raw = await searchParams;
+  const parsed = userListQuerySchema.safeParse({ page: raw.page, pageSize: raw.pageSize });
+  const query: UserListQuery = parsed.success
+    ? parsed.data
+    : { page: 1, pageSize: DEFAULT_PAGE_SIZE };
+  const { users, total } = await getUsers(query);
+  const href = (page: number) => {
+    const params = new URLSearchParams();
+    if (page > 1) params.set('page', String(page));
+    if (query.pageSize !== DEFAULT_PAGE_SIZE) params.set('pageSize', String(query.pageSize));
+    return `/admin/customers${params.size ? `?${params}` : ''}`;
+  };
 
   return (
     <section className="mt-8">
-      <p className="text-sm text-muted-foreground">
-        {total} {total === 1 ? 'account' : 'accounts'}
-      </p>
-      <div className="mt-4 border">
+      <div className="border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -68,6 +78,13 @@ async function UsersTable() {
           </TableBody>
         </Table>
       </div>
+      <ListFooter
+        summary={`${total} ${total === 1 ? 'account' : 'accounts'}`}
+        total={total}
+        page={query.page}
+        pageSize={query.pageSize}
+        href={href}
+      />
     </section>
   );
 }
