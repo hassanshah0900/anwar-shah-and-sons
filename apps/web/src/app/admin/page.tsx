@@ -5,6 +5,7 @@ import { RevenueChart } from '@/components/admin/dashboard/revenue-chart';
 import { StatTile } from '@/components/admin/dashboard/stat-tile';
 import { formatOrderDate } from '@/components/orders/order-details';
 import { OrderStatusBadge } from '@/components/orders/order-status-badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -41,16 +42,15 @@ async function Overview() {
   return (
     <div className="mt-8 flex flex-col gap-12">
       {data.refundsDue > 0 && (
-        <p
-          role="alert"
-          className="rounded-md border border-destructive p-4 text-sm text-destructive"
-        >
-          {plural(data.refundsDue, 'refund')} failed and {data.refundsDue === 1 ? 'needs' : 'need'}{' '}
-          another try.{' '}
-          <Link href="/admin/orders?refundDue=true" className="underline underline-offset-4">
-            View {data.refundsDue === 1 ? 'it' : 'them'}
-          </Link>
-        </p>
+        <Alert variant="destructive" className="border-destructive p-4">
+          <AlertDescription>
+            {plural(data.refundsDue, 'refund')} failed and{' '}
+            {data.refundsDue === 1 ? 'needs' : 'need'} another try.{' '}
+            <Link href="/admin/orders?refundDue=true" className="underline underline-offset-4">
+              View {data.refundsDue === 1 ? 'it' : 'them'}
+            </Link>
+          </AlertDescription>
+        </Alert>
       )}
       <section
         aria-label="Key figures"

@@ -5,6 +5,7 @@ import { CheckCircle2Icon } from 'lucide-react';
 import { canCustomerCancel, isAwaitingPayment } from '@repo/shared';
 import { formatOrderDate, OrderDetails } from '@/components/orders/order-details';
 import { OrderStatusBadge } from '@/components/orders/order-status-badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getMyOrder } from '@/lib/api/orders';
 import { ApiError } from '@/lib/api/server';
@@ -88,12 +89,10 @@ async function OrderView({ params, searchParams }: Props) {
 
 function Notice({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div role="status" className="flex gap-3 rounded-md border p-5">
-      <CheckCircle2Icon className="mt-0.5 size-5 shrink-0" aria-hidden />
-      <div className="flex flex-col gap-1">
-        <p className="font-medium">{title}</p>
-        <p className="text-sm text-muted-foreground">{children}</p>
-      </div>
-    </div>
+    <Alert role="status" className="gap-x-3 gap-y-1 p-5 text-base">
+      <CheckCircle2Icon aria-hidden />
+      <AlertTitle>{title}</AlertTitle>
+      <AlertDescription>{children}</AlertDescription>
+    </Alert>
   );
 }

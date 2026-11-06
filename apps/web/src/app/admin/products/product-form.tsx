@@ -10,6 +10,7 @@ import {
 } from '@repo/shared';
 import { FormError } from '@/components/forms/form-error';
 import { FormField } from '@/components/forms/form-field';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -58,9 +59,9 @@ export function ProductForm({ action, categories, optionTypes, store, product }:
     <form key={formKey(state)} action={formAction} className="grid max-w-3xl gap-8" noValidate>
       {product && <input type="hidden" name="id" value={product.id} />}
       {state.status === 'success' && state.message && (
-        <p role="status" className="border px-3 py-2 text-sm">
-          {state.message}
-        </p>
+        <Alert role="status" className="px-3">
+          <AlertDescription className="text-foreground">{state.message}</AlertDescription>
+        </Alert>
       )}
       <FormError message={state.status === 'error' ? (state.message ?? null) : null} />
 
