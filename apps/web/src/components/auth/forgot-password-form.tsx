@@ -54,13 +54,14 @@ export function ForgotPasswordForm() {
         </p>
         <p className="text-sm text-muted-foreground">
           No email? Check your spam folder, or{' '}
-          <button
+          <Button
             type="button"
+            variant="link"
             onClick={() => setSentTo(null)}
-            className="text-foreground underline underline-offset-4"
+            className="h-auto p-0 font-normal text-foreground underline"
           >
             try again
-          </button>
+          </Button>
           .
         </p>
       </div>

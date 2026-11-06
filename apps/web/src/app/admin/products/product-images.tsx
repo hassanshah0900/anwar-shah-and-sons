@@ -28,6 +28,7 @@ import {
 import { formKey, initialActionState } from '@/lib/forms/action-state';
 import { deleteImage, moveImage, updateImage, uploadImage } from './image-actions';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 
 const ALL = 'all';
 
@@ -264,7 +265,7 @@ function UploadForm({ productId, values }: { productId: string; values: OptionVa
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="grid gap-2">
             <Label htmlFor="image-file">Image (JPEG, PNG, WebP or AVIF, up to 5 MB)</Label>
-            <input
+            <Input
               id="image-file"
               name="file"
               type="file"
@@ -272,7 +273,6 @@ function UploadForm({ productId, values }: { productId: string; values: OptionVa
               onChange={checkFile}
               aria-invalid={fileError ? true : undefined}
               aria-describedby={fileError ? 'image-file-error' : undefined}
-              className="text-sm file:mr-3 file:rounded-md file:border file:border-input file:bg-background file:px-3 file:py-1.5 file:text-sm file:font-medium"
             />
             {fileError && (
               <p id="image-file-error" className="text-sm text-destructive">

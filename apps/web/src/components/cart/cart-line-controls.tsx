@@ -59,14 +59,15 @@ export function CartLineControls({
           <PlusIcon />
         </Button>
       </div>
-      <button
+      <Button
         type="button"
+        variant="link"
         disabled={pending}
         onClick={() => change(() => removeFromCart(variantId))}
-        className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground disabled:opacity-50"
+        className="h-auto p-0 font-normal text-muted-foreground underline hover:text-foreground"
       >
         Remove<span className="sr-only"> {name}</span>
-      </button>
+      </Button>
     </div>
   );
 }
