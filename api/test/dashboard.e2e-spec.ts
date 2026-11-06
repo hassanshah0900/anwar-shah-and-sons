@@ -2,11 +2,13 @@ import { INestApplication } from '@nestjs/common';
 import { dashboardSchema, DASHBOARD_DAYS, type Dashboard } from '@repo/shared';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
-import { PrismaService } from '../src/prisma/prisma.service.js';
 import { createTestApp, WEB_ORIGIN } from './support/app.js';
 import { adminApi } from './support/catalog.js';
-import { resetCatalog } from './support/database.js';
 import { signUpAs } from './support/users.js';
+import { desc } from 'drizzle-orm';
+import type { Database } from '../src/db/connection.js';
+import { carts, orders, users } from '../src/db/schema/index.js';
+import { resetCatalog, testDatabase, variantOf } from './support/database.js';
 
 const TIME_ZONE = 'Asia/Karachi'; // The default STORE_TIMEZONE.
 const SHIPPING = 250; // vitest.config.e2e.ts
@@ -17,7 +19,7 @@ const localDate = (date: Date) => date.toLocaleDateString('en-CA', { timeZone: T
 
 describe('Admin dashboard (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let db: Database;
   let admin: ReturnType<typeof adminApi>;
   let customer: string[];
   let productId: string;
@@ -28,30 +30,28 @@ describe('Admin dashboard (e2e)', () => {
 
   /** An order written straight to the database, for dates the API can't produce. */
   const pastOrder = (createdAt: Date, total: number, status: 'pending' | 'cancelled' = 'pending') =>
-    prisma.order.create({
-      data: {
-        email: 'past@example.com',
-        status,
-        paymentMethod: 'cod',
-        currency: 'PKR',
-        subtotal: total,
-        shipping: 0,
-        total,
-        fullName: 'Past Customer',
-        phone: '+92 300 0000000',
-        line1: '1 Old Road',
-        city: 'Lahore',
-        createdAt,
-      },
+    db.insert(orders).values({
+      email: 'past@example.com',
+      status,
+      paymentMethod: 'cod',
+      currency: 'PKR',
+      subtotal: total,
+      shipping: 0,
+      total,
+      fullName: 'Past Customer',
+      phone: '+92 300 0000000',
+      line1: '1 Old Road',
+      city: 'Lahore',
+      createdAt,
     });
 
   beforeAll(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
-    await prisma.order.deleteMany();
-    await prisma.cart.deleteMany();
-    await resetCatalog(prisma);
-    await prisma.user.deleteMany();
+    db = testDatabase(app);
+    await db.delete(orders);
+    await db.delete(carts);
+    await resetCatalog(db);
+    await db.delete(users);
     admin = adminApi(app, await signUpAs(app, 'dashboard-admin@example.com', 'admin'));
     customer = await signUpAs(app, 'dashboard-customer@example.com');
 
@@ -81,11 +81,7 @@ describe('Admin dashboard (e2e)', () => {
           optionValueIds: [valueId],
         })
         .expect(201);
-      variant[key] = (
-        await prisma.productVariant.findFirstOrThrow({
-          where: { productId, optionValues: { some: { optionValueId: valueId } } },
-        })
-      ).id;
+      variant[key] = (await variantOf(db, productId, valueId)).id;
     }
     await admin.patch(`/products/${productId}`, { status: 'active' }).expect(200);
   });
@@ -142,7 +138,12 @@ describe('Admin dashboard (e2e)', () => {
     const first = await placeOrder(variant.scarce!, 2); // 6,250
     const second = await placeOrder(variant.plenty!, 1); // 3,250
     await placeOrder(variant.plenty!, 1); // 3,250, cancelled below
-    const cancelled = (await prisma.order.findFirstOrThrow({ orderBy: { number: 'desc' } })).number;
+    const [latest] = await db
+      .select({ number: orders.number })
+      .from(orders)
+      .orderBy(desc(orders.number))
+      .limit(1);
+    const cancelled = latest!.number;
     await admin.patch(`/orders/${cancelled}`, { status: 'cancelled' }).expect(200);
     await admin.patch(`/orders/${second}`, { status: 'confirmed' }).expect(200);
 

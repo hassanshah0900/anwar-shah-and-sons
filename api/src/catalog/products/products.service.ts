@@ -7,7 +7,7 @@ import {
   type ProductListQuery,
   type ProductUpdate,
 } from '@repo/shared';
-import { and, asc, desc, eq, exists, inArray, or, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, exists, inArray, or, sum } from 'drizzle-orm';
 import { invalidField } from '../../common/zod-validation.pipe.js';
 import type { Database } from '../../db/connection.js';
 import { InjectDatabase } from '../../db/database.module.js';
@@ -64,12 +64,6 @@ export class ProductsService {
           price: products.price,
           updatedAt: products.updatedAt,
           category: { id: categories.id, name: categories.name },
-          variantCount: sql<number>`(
-            SELECT count(*)::int FROM ${productVariants}
-            WHERE ${productVariants.productId} = ${products.id})`,
-          totalStock: sql<number>`(
-            SELECT coalesce(sum(${productVariants.stock}), 0)::int FROM ${productVariants}
-            WHERE ${productVariants.productId} = ${products.id})`,
         })
         .from(products)
         .innerJoin(categories, eq(categories.id, products.categoryId))
@@ -80,9 +74,29 @@ export class ProductsService {
       this.db.$count(products, where),
     ]);
 
+    const variants = rows.length
+      ? await this.db
+          .select({
+            productId: productVariants.productId,
+            count: count(),
+            stock: sum(productVariants.stock).mapWith(Number),
+          })
+          .from(productVariants)
+          .where(
+            inArray(
+              productVariants.productId,
+              rows.map((row) => row.id),
+            ),
+          )
+          .groupBy(productVariants.productId)
+      : [];
+    const byProduct = new Map(variants.map((entry) => [entry.productId, entry]));
+
     return {
       products: rows.map(({ updatedAt, ...row }) => ({
         ...row,
+        variantCount: byProduct.get(row.id)?.count ?? 0,
+        totalStock: byProduct.get(row.id)?.stock ?? 0,
         updatedAt: updatedAt.toISOString(),
       })),
       total,

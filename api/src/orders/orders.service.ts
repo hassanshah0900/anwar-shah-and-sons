@@ -1,3 +1,4 @@
+import { and, asc, desc, eq, gte, inArray, isNotNull, lt, sql, sum, type SQL } from 'drizzle-orm';
 import {
   BadRequestException,
   ConflictException,
@@ -22,9 +23,12 @@ import {
   type PaymentLink,
 } from '@repo/shared';
 import { AddressesService } from '../addresses/addresses.service.js';
-import { lineSelect, toLine } from '../cart/cart-line.js';
+import { findCartLines, toLine } from '../cart/cart-line.js';
 import type { Env } from '../config/env.js';
-import type { Prisma } from '../generated/prisma/client.js';
+import type { Database } from '../db/connection.js';
+import { InjectDatabase } from '../db/database.module.js';
+import { found, orNotFound, touch, type Queryable } from '../db/queries.js';
+import { cartItems, carts, orderItems, orders, productVariants } from '../db/schema/index.js';
 import { Mailer } from '../mail/mailer.js';
 import {
   orderCancelledEmail,
@@ -33,60 +37,31 @@ import {
   orderShippedEmail,
 } from '../mail/templates.js';
 import { PaymentGateway } from '../payments/payment-gateway.js';
-import { PrismaService } from '../prisma/prisma.service.js';
 import { storeConfig } from '../store/store-config.js';
 
-const orderSelect = {
-  id: true,
-  number: true,
-  status: true,
-  paymentMethod: true,
-  paymentStatus: true,
-  stripeSessionId: true,
-  stripePaymentIntentId: true,
-  email: true,
-  fullName: true,
-  phone: true,
-  line1: true,
-  line2: true,
-  city: true,
-  postalCode: true,
-  notes: true,
-  currency: true,
-  subtotal: true,
-  shipping: true,
-  total: true,
-  createdAt: true,
-  updatedAt: true,
-  items: {
-    select: {
-      productName: true,
-      variantLabel: true,
-      sku: true,
-      imageKey: true,
-      unitPrice: true,
-      quantity: true,
-      lineTotal: true,
-      product: { select: { slug: true } },
+/** An order with its lines, or undefined. */
+function findOrder(db: Queryable, where: SQL) {
+  return db.query.orders.findFirst({
+    where,
+    with: {
+      items: {
+        columns: {
+          productName: true,
+          variantLabel: true,
+          sku: true,
+          imageKey: true,
+          unitPrice: true,
+          quantity: true,
+          lineTotal: true,
+        },
+        with: { product: { columns: { slug: true } } },
+        orderBy: [asc(orderItems.id)],
+      },
     },
-    orderBy: { id: 'asc' },
-  },
-} satisfies Prisma.OrderSelect;
+  });
+}
 
-const summarySelect = {
-  number: true,
-  status: true,
-  paymentMethod: true,
-  paymentStatus: true,
-  email: true,
-  fullName: true,
-  total: true,
-  createdAt: true,
-  items: { select: { quantity: true } },
-} satisfies Prisma.OrderSelect;
-
-type OrderRow = Prisma.OrderGetPayload<{ select: typeof orderSelect }>;
-type SummaryRow = Prisma.OrderGetPayload<{ select: typeof summarySelect }>;
+type OrderRow = NonNullable<Awaited<ReturnType<typeof findOrder>>>;
 
 /** A customer placing or viewing their own orders. */
 export type Customer = { id: string; email: string };
@@ -94,11 +69,11 @@ export type Customer = { id: string; email: string };
 /** Statuses the customer is emailed about, besides the order being placed. */
 const MINUTE_MS = 60_000;
 /** Cancelled orders whose refund failed (see isRefundDue). */
-const refundDueWhere = {
-  paymentMethod: 'card',
-  paymentStatus: 'paid',
-  status: 'cancelled',
-} satisfies Prisma.OrderWhereInput;
+const refundDueWhere = and(
+  eq(orders.paymentMethod, 'card'),
+  eq(orders.paymentStatus, 'paid'),
+  eq(orders.status, 'cancelled'),
+);
 /** How many overdue orders one run of the payments job looks at. */
 const OVERDUE_BATCH = 50;
 
@@ -112,7 +87,7 @@ export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
 
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectDatabase() private readonly db: Database,
     private readonly config: ConfigService<Env, true>,
     private readonly mailer: Mailer,
     private readonly addresses: AddressesService,
@@ -133,13 +108,13 @@ export class OrdersService {
       throw new BadRequestException('That payment method is not available');
     }
 
-    const { order, variantIds } = await this.prisma.$transaction(async (tx) => {
-      const rows = await tx.cartItem.findMany({
-        where: { cart: { userId: customer.id } },
-        select: { ...lineSelect, cartId: true },
-        orderBy: { createdAt: 'asc' },
-      });
-      if (rows.length === 0) throw new BadRequestException('Your bag is empty');
+    const { order, variantIds } = await this.db.transaction(async (tx) => {
+      const [cart] = await tx
+        .select({ id: carts.id })
+        .from(carts)
+        .where(eq(carts.userId, customer.id));
+      const rows = cart ? await findCartLines(tx, cart.id) : [];
+      if (!cart || rows.length === 0) throw new BadRequestException('Your bag is empty');
 
       const lines = rows.map((row) => ({ row, line: toLine(row) }));
       for (const { line } of lines) {
@@ -158,54 +133,61 @@ export class OrdersService {
 
       for (const { row, line } of lines) {
         // Conditional decrement: two shoppers can't both buy the last one.
-        const { count } = await tx.productVariant.updateMany({
-          where: { id: line.variantId, stock: { gte: line.quantity } },
-          data: { stock: { decrement: line.quantity } },
-        });
-        if (count === 0) {
+        const taken = await tx
+          .update(productVariants)
+          .set(touch({ stock: sql`${productVariants.stock} - ${line.quantity}` }))
+          .where(
+            and(eq(productVariants.id, line.variantId), gte(productVariants.stock, line.quantity)),
+          )
+          .returning({ id: productVariants.id });
+        if (taken.length === 0) {
           throw new ConflictException(`${row.variant.product.name} has just sold out.`);
         }
       }
 
-      const order = await tx.order.create({
-        data: {
-          userId: customer.id,
-          email: customer.email,
-          paymentMethod: input.paymentMethod,
-          currency: store.currency,
-          subtotal,
-          shipping,
-          total: subtotal + shipping,
-          fullName: input.address.fullName,
-          phone: input.address.phone,
-          line1: input.address.line1,
-          line2: input.address.line2,
-          city: input.address.city,
-          postalCode: input.address.postalCode,
-          notes: input.notes,
-          items: {
-            create: lines.map(({ row, line }) => ({
-              variantId: line.variantId,
-              productId: line.productId,
-              productName: line.name,
-              variantLabel: line.options
-                .map((option) => `${option.name}: ${option.value}`)
-                .join(' · '),
-              sku: row.variant.sku,
-              imageKey: line.image?.key ?? null,
-              unitPrice: line.unitPrice,
-              quantity: line.quantity,
-              lineTotal: line.lineTotal,
-            })),
-          },
-        },
-        select: orderSelect,
-      });
+      const { id: orderId } = found(
+        await tx
+          .insert(orders)
+          .values({
+            userId: customer.id,
+            email: customer.email,
+            paymentMethod: input.paymentMethod,
+            currency: store.currency,
+            subtotal,
+            shipping,
+            total: subtotal + shipping,
+            fullName: input.address.fullName,
+            phone: input.address.phone,
+            line1: input.address.line1,
+            line2: input.address.line2,
+            city: input.address.city,
+            postalCode: input.address.postalCode,
+            notes: input.notes,
+          })
+          .returning({ id: orders.id }),
+      );
+      await tx.insert(orderItems).values(
+        lines.map(({ row, line }) => ({
+          orderId,
+          variantId: line.variantId,
+          productId: line.productId,
+          productName: line.name,
+          variantLabel: line.options.map((option) => `${option.name}: ${option.value}`).join(' · '),
+          sku: row.variant.sku,
+          imageKey: line.image?.key ?? null,
+          unitPrice: line.unitPrice,
+          quantity: line.quantity,
+          lineTotal: line.lineTotal,
+        })),
+      );
 
       if (input.paymentMethod === 'cod') {
-        await tx.cartItem.deleteMany({ where: { cartId: rows[0]!.cartId } });
+        await tx.delete(cartItems).where(eq(cartItems.cartId, cart.id));
       }
-      return { order: toOrder(order), variantIds: lines.map(({ line }) => line.variantId) };
+      return {
+        order: toOrder(orNotFound(await findOrder(tx, eq(orders.id, orderId)))),
+        variantIds: lines.map(({ line }) => line.variantId),
+      };
     });
 
     const paymentUrl =
@@ -226,7 +208,13 @@ export class OrdersService {
 
   /** A customer's own orders, newest first. */
   async listMine(customerId: string, query: OrderListQuery): Promise<OrderList> {
-    return this.list({ userId: customerId, status: query.status }, query);
+    return this.list(
+      and(
+        eq(orders.userId, customerId),
+        query.status ? eq(orders.status, query.status) : undefined,
+      ),
+      query,
+    );
   }
 
   /**
@@ -235,8 +223,8 @@ export class OrdersService {
    * paying sees it paid even if the webhook hasn't arrived yet.
    */
   async findMine(customerId: string, number: number): Promise<Order> {
-    const where = { number, userId: customerId };
-    const order = await this.prisma.order.findFirst({ where, select: orderSelect });
+    const where = and(eq(orders.number, number), eq(orders.userId, customerId))!;
+    const order = await findOrder(this.db, where);
     if (!order) throw new NotFoundException('Order not found');
     if (!isAwaitingPayment(order) || !order.stripeSessionId) return toOrder(order);
 
@@ -246,7 +234,7 @@ export class OrdersService {
       this.logger.error(`Checking the payment of order #${number} failed`, error);
       return toOrder(order);
     }
-    return toOrder(await this.prisma.order.findFirstOrThrow({ where, select: orderSelect }));
+    return toOrder(orNotFound(await findOrder(this.db, where)));
   }
 
   /**
@@ -254,10 +242,10 @@ export class OrdersService {
    * refunded if paid. Cancelling it again changes nothing.
    */
   async cancelMine(customerId: string, number: number): Promise<Order> {
-    const order = await this.prisma.order.findFirst({
-      where: { number, userId: customerId },
-      select: { status: true },
-    });
+    const [order] = await this.db
+      .select({ status: orders.status })
+      .from(orders)
+      .where(and(eq(orders.number, number), eq(orders.userId, customerId)));
     if (!order) throw new NotFoundException('Order not found');
     if (order.status !== 'cancelled' && !canCustomerCancel(order)) {
       throw new ConflictException(
@@ -269,10 +257,10 @@ export class OrdersService {
 
   /** The page where the customer can finish paying, while there's still time. */
   async resumePayment(customerId: string, number: number): Promise<PaymentLink> {
-    const order = await this.prisma.order.findFirst({
-      where: { number, userId: customerId },
-      select: orderSelect,
-    });
+    const order = await findOrder(
+      this.db,
+      and(eq(orders.number, number), eq(orders.userId, customerId))!,
+    );
     if (!order) throw new NotFoundException('Order not found');
     if (!isAwaitingPayment(order) || !order.stripeSessionId) {
       throw new ConflictException('This order is not waiting for a payment.');
@@ -289,10 +277,16 @@ export class OrdersService {
    * than the webhook believed, so repeated or out-of-order calls are harmless.
    */
   async syncPayment(sessionId: string): Promise<void> {
-    const order = await this.prisma.order.findUnique({
-      where: { stripeSessionId: sessionId },
-      select: { id: true, number: true, status: true, paymentMethod: true, paymentStatus: true },
-    });
+    const [order] = await this.db
+      .select({
+        id: orders.id,
+        number: orders.number,
+        status: orders.status,
+        paymentMethod: orders.paymentMethod,
+        paymentStatus: orders.paymentStatus,
+      })
+      .from(orders)
+      .where(eq(orders.stripeSessionId, sessionId));
     if (!order) {
       this.logger.warn(`Payment session ${sessionId} doesn't belong to an order`);
       return;
@@ -312,19 +306,21 @@ export class OrdersService {
    * ended. Returns how many it looked at; one failing doesn't stop the others.
    */
   async settleOverdue(before: Date): Promise<number> {
-    const orders = await this.prisma.order.findMany({
-      where: {
-        paymentMethod: 'card',
-        paymentStatus: 'unpaid',
-        status: 'pending',
-        createdAt: { lt: before },
-      },
-      select: { number: true, stripeSessionId: true },
-      orderBy: { createdAt: 'asc' },
-      take: OVERDUE_BATCH,
-    });
+    const overdue = await this.db
+      .select({ number: orders.number, stripeSessionId: orders.stripeSessionId })
+      .from(orders)
+      .where(
+        and(
+          eq(orders.paymentMethod, 'card'),
+          eq(orders.paymentStatus, 'unpaid'),
+          eq(orders.status, 'pending'),
+          lt(orders.createdAt, before),
+        ),
+      )
+      .orderBy(asc(orders.createdAt))
+      .limit(OVERDUE_BATCH);
 
-    for (const { number, stripeSessionId } of orders) {
+    for (const { number, stripeSessionId } of overdue) {
       try {
         // No session means the API stopped while starting the payment.
         if (stripeSessionId) await this.syncPayment(stripeSessionId);
@@ -333,25 +329,25 @@ export class OrdersService {
         this.logger.error(`Settling the payment of order #${number} failed`, error);
       }
     }
-    return orders.length;
+    return overdue.length;
   }
 
   /** Every order, newest first (admin). */
   listAll(query: OrderListQuery): Promise<OrderList> {
     return this.list(
-      query.refundDue ? refundDueWhere : query.status ? { status: query.status } : {},
+      query.refundDue ? refundDueWhere : query.status ? eq(orders.status, query.status) : undefined,
       query,
     );
   }
 
   async findAny(number: number): Promise<Order> {
-    const order = await this.prisma.order.findUnique({ where: { number }, select: orderSelect });
+    const order = await findOrder(this.db, eq(orders.number, number));
     if (!order) throw new NotFoundException('Order not found');
     return toOrder(order);
   }
 
   countRefundsDue(): Promise<number> {
-    return this.prisma.order.count({ where: refundDueWhere });
+    return this.db.$count(orders, refundDueWhere);
   }
 
   /**
@@ -360,7 +356,7 @@ export class OrdersService {
    * to refund a charge beyond its amount.
    */
   async retryRefund(number: number): Promise<Order> {
-    const row = await this.prisma.order.findUnique({ where: { number }, select: orderSelect });
+    const row = await findOrder(this.db, eq(orders.number, number));
     if (!row) throw new NotFoundException('Order not found');
     if (!isRefundDue(row)) throw new ConflictException('This order has no refund due.');
 
@@ -387,11 +383,16 @@ export class OrdersService {
     status: OrderStatus,
     { notify = true, expireSession = true }: { notify?: boolean; expireSession?: boolean } = {},
   ): Promise<Order> {
-    const { order, changed } = await this.prisma.$transaction(async (tx) => {
-      const order = await tx.order.findUnique({
-        where: { number },
-        select: { id: true, status: true, paymentMethod: true, paymentStatus: true },
-      });
+    const { order, changed } = await this.db.transaction(async (tx) => {
+      const [order] = await tx
+        .select({
+          id: orders.id,
+          status: orders.status,
+          paymentMethod: orders.paymentMethod,
+          paymentStatus: orders.paymentStatus,
+        })
+        .from(orders)
+        .where(eq(orders.number, number));
       if (!order) throw new NotFoundException('Order not found');
       if (order.status === status) {
         return { order: toOrder(await this.select(tx, order.id)), changed: false };
@@ -403,22 +404,26 @@ export class OrdersService {
         throw new ConflictException("This order hasn't been paid yet.");
       }
 
-      const { count } = await tx.order.updateMany({
-        where: { id: order.id, status: order.status },
-        data: { status, ...(status === 'delivered' ? { paymentStatus: 'paid' as const } : {}) },
-      });
-      if (count === 0) throw new ConflictException('The order was just changed. Please reload.');
+      const moved = await tx
+        .update(orders)
+        .set(
+          touch({ status, ...(status === 'delivered' ? { paymentStatus: 'paid' as const } : {}) }),
+        )
+        .where(and(eq(orders.id, order.id), eq(orders.status, order.status)))
+        .returning({ id: orders.id });
+      if (moved.length === 0)
+        throw new ConflictException('The order was just changed. Please reload.');
 
       if (status === 'cancelled') {
-        const items = await tx.orderItem.findMany({
-          where: { orderId: order.id, variantId: { not: null } },
-          select: { variantId: true, quantity: true },
-        });
+        const items = await tx
+          .select({ variantId: orderItems.variantId, quantity: orderItems.quantity })
+          .from(orderItems)
+          .where(and(eq(orderItems.orderId, order.id), isNotNull(orderItems.variantId)));
         for (const item of items) {
-          await tx.productVariant.update({
-            where: { id: item.variantId! },
-            data: { stock: { increment: item.quantity } },
-          });
+          await tx
+            .update(productVariants)
+            .set(touch({ stock: sql`${productVariants.stock} + ${item.quantity}` }))
+            .where(eq(productVariants.id, item.variantId!));
         }
       }
       return { order: toOrder(await this.select(tx, order.id)), changed: true };
@@ -473,15 +478,26 @@ export class OrdersService {
       );
     }
 
-    await this.prisma.$transaction([
-      this.prisma.order.update({
-        where: { number: order.number },
-        data: { stripeSessionId: session.id },
-      }),
-      this.prisma.cartItem.deleteMany({
-        where: { cart: { userId: customer.id }, variantId: { in: variantIds } },
-      }),
-    ]);
+    await this.db.transaction(async (tx) => {
+      found(
+        await tx
+          .update(orders)
+          .set(touch({ stripeSessionId: session.id }))
+          .where(eq(orders.number, order.number))
+          .returning({ id: orders.id }),
+      );
+      await tx
+        .delete(cartItems)
+        .where(
+          and(
+            inArray(
+              cartItems.cartId,
+              tx.select({ id: carts.id }).from(carts).where(eq(carts.userId, customer.id)),
+            ),
+            inArray(cartItems.variantId, variantIds),
+          ),
+        );
+    });
     return session.url;
   }
 
@@ -491,16 +507,17 @@ export class OrdersService {
    * after the order was cancelled goes straight back to the customer.
    */
   private async markPaid(id: string, paymentIntentId: string | null): Promise<void> {
-    const order = await this.prisma.$transaction(async (tx) => {
-      const { count } = await tx.order.updateMany({
-        where: { id, paymentStatus: 'unpaid' },
-        data: { paymentStatus: 'paid', stripePaymentIntentId: paymentIntentId },
-      });
-      if (count === 0) return null;
-      await tx.order.updateMany({
-        where: { id, status: 'pending' },
-        data: { status: 'confirmed' },
-      });
+    const order = await this.db.transaction(async (tx) => {
+      const paid = await tx
+        .update(orders)
+        .set(touch({ paymentStatus: 'paid' as const, stripePaymentIntentId: paymentIntentId }))
+        .where(and(eq(orders.id, id), eq(orders.paymentStatus, 'unpaid')))
+        .returning({ id: orders.id });
+      if (paid.length === 0) return null;
+      await tx
+        .update(orders)
+        .set(touch({ status: 'confirmed' as const }))
+        .where(and(eq(orders.id, id), eq(orders.status, 'pending')));
       return this.select(tx, id);
     });
     if (!order) return;
@@ -519,10 +536,7 @@ export class OrdersService {
   private async closePayment(order: Order, expireSession: boolean): Promise<Order> {
     if (order.paymentMethod !== 'card') return order;
 
-    const row = await this.prisma.order.findUniqueOrThrow({
-      where: { number: order.number },
-      select: orderSelect,
-    });
+    const row = orNotFound(await findOrder(this.db, eq(orders.number, order.number)));
     if (row.paymentStatus === 'paid') {
       return (await this.refund(row)) ? { ...order, paymentStatus: 'refunded' } : order;
     }
@@ -544,10 +558,10 @@ export class OrdersService {
     try {
       if (!order.stripePaymentIntentId) throw new Error('The order has no payment intent');
       await this.gateway.refund(order.stripePaymentIntentId, idempotencyKey);
-      await this.prisma.order.update({
-        where: { id: order.id },
-        data: { paymentStatus: 'refunded' },
-      });
+      await this.db
+        .update(orders)
+        .set(touch({ paymentStatus: 'refunded' as const }))
+        .where(eq(orders.id, order.id));
       return true;
     } catch (error) {
       this.logger.error(`Refunding order #${order.number} failed`, error);
@@ -577,22 +591,53 @@ export class OrdersService {
       );
   }
 
-  private select(tx: Prisma.TransactionClient, id: string): Promise<OrderRow> {
-    return tx.order.findUniqueOrThrow({ where: { id }, select: orderSelect });
+  private async select(tx: Queryable, id: string): Promise<OrderRow> {
+    return orNotFound(await findOrder(tx, eq(orders.id, id)));
   }
 
-  private async list(where: Prisma.OrderWhereInput, query: OrderListQuery): Promise<OrderList> {
+  private async list(where: SQL | undefined, query: OrderListQuery): Promise<OrderList> {
     const [rows, total] = await Promise.all([
-      this.prisma.order.findMany({
-        where,
-        select: summarySelect,
-        orderBy: { createdAt: 'desc' },
-        skip: (query.page - 1) * query.pageSize,
-        take: query.pageSize,
-      }),
-      this.prisma.order.count({ where }),
+      this.db
+        .select({
+          id: orders.id,
+          number: orders.number,
+          status: orders.status,
+          paymentMethod: orders.paymentMethod,
+          paymentStatus: orders.paymentStatus,
+          email: orders.email,
+          customerName: orders.fullName,
+          total: orders.total,
+          createdAt: orders.createdAt,
+        })
+        .from(orders)
+        .where(where)
+        .orderBy(desc(orders.createdAt))
+        .offset((query.page - 1) * query.pageSize)
+        .limit(query.pageSize),
+      this.db.$count(orders, where),
     ]);
-    return { orders: rows.map(toSummary), total };
+    const counts = rows.length
+      ? await this.db
+          .select({ orderId: orderItems.orderId, items: sum(orderItems.quantity).mapWith(Number) })
+          .from(orderItems)
+          .where(
+            inArray(
+              orderItems.orderId,
+              rows.map((row) => row.id),
+            ),
+          )
+          .groupBy(orderItems.orderId)
+      : [];
+    const itemCount = new Map(counts.map((count) => [count.orderId, count.items]));
+
+    return {
+      orders: rows.map(({ id, createdAt, ...row }) => ({
+        ...row,
+        itemCount: itemCount.get(id) ?? 0,
+        createdAt: createdAt.toISOString(),
+      })),
+      total,
+    };
   }
 }
 
@@ -622,19 +667,5 @@ function toOrder(row: OrderRow): Order {
     })),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
-  };
-}
-
-function toSummary(row: SummaryRow) {
-  return {
-    number: row.number,
-    status: row.status,
-    paymentMethod: row.paymentMethod,
-    paymentStatus: row.paymentStatus,
-    email: row.email,
-    customerName: row.fullName,
-    itemCount: row.items.reduce((sum, item) => sum + item.quantity, 0),
-    total: row.total,
-    createdAt: row.createdAt.toISOString(),
   };
 }

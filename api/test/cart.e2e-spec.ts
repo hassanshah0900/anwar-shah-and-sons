@@ -4,15 +4,17 @@ import request from 'supertest';
 import { App } from 'supertest/types.js';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CartCleanupJob } from '../src/cart/cart-cleanup.job.js';
-import { PrismaService } from '../src/prisma/prisma.service.js';
 import { createTestApp, WEB_ORIGIN } from './support/app.js';
 import { adminApi } from './support/catalog.js';
-import { resetCatalog } from './support/database.js';
 import { signUpAs } from './support/users.js';
+import { desc, isNull, ne } from 'drizzle-orm';
+import type { Database } from '../src/db/connection.js';
+import { carts, users } from '../src/db/schema/index.js';
+import { resetCatalog, testDatabase, variantOf } from './support/database.js';
 
 describe('Cart (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let db: Database;
   let admin: ReturnType<typeof adminApi>;
   let productId: string;
   /** Variant ids by name: small (stock 3), medium (stock 20, own price), draft. */
@@ -41,10 +43,10 @@ describe('Cart (e2e)', () => {
 
   beforeAll(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
-    await prisma.cart.deleteMany();
-    await resetCatalog(prisma);
-    await prisma.user.deleteMany();
+    db = testDatabase(app);
+    await db.delete(carts);
+    await resetCatalog(db);
+    await db.delete(users);
     admin = adminApi(app, await signUpAs(app, 'cart-admin@example.com', 'admin'));
 
     const categoryId = (await admin.post('/categories', { name: 'Kurtas' }).expect(201)).body.id;
@@ -74,14 +76,7 @@ describe('Cart (e2e)', () => {
           })
           .expect(201);
         // The endpoint answers with the whole product; find the new variant by its size.
-        variant[key] = (
-          await prisma.productVariant.findFirstOrThrow({
-            where: {
-              productId: created.id,
-              optionValues: { some: { optionValueId: value[label] } },
-            },
-          })
-        ).id;
+        variant[key] = (await variantOf(db, created.id, value[label])).id;
       }
       return created.id as string;
     };
@@ -100,7 +95,7 @@ describe('Cart (e2e)', () => {
 
   it('starts empty, without creating a cart', async () => {
     expect(await getCart()).toEqual({ lines: [], itemCount: 0, subtotal: 0 });
-    expect(await prisma.cart.count()).toBe(0);
+    expect(await db.$count(carts)).toBe(0);
   });
 
   it('creates a guest cart on the first add and returns its token once', async () => {
@@ -125,8 +120,8 @@ describe('Cart (e2e)', () => {
     expect(cart).toMatchObject({ itemCount: 2, subtotal: 9980 });
 
     // Only the hash is stored; the token itself is the guest's secret.
-    const stored = await prisma.cart.findFirstOrThrow({ select: { tokenHash: true } });
-    expect(stored.tokenHash).not.toBe(token);
+    const [stored] = await db.select({ tokenHash: carts.tokenHash }).from(carts);
+    expect(stored?.tokenHash).not.toBe(token);
 
     // The same token reaches the same cart, and later adds return no new token.
     expect((await getCart({ token: token! })).itemCount).toBe(2);
@@ -301,23 +296,23 @@ describe('Cart (e2e)', () => {
 
   it('deletes guest carts left untouched past the time limit, and nothing else', async () => {
     const DAY = 86_400_000;
-    await prisma.cart.deleteMany();
+    await db.delete(carts);
     const oldGuest = await addAsNewGuest(variant.small!, 1);
     const recentGuest = await addAsNewGuest(variant.small!, 1);
     const customer = await signUpAs(app, 'cart-keeper@example.com');
     await add(variant.medium!, 1, { cookies: customer }).expect(201);
 
     // Age everything but the recent guest cart past the default 60 days.
-    const recentId = (
-      await prisma.cart.findFirstOrThrow({
-        orderBy: { createdAt: 'desc' },
-        where: { userId: null },
-      })
-    ).id;
-    await prisma.cart.updateMany({
-      where: { id: { not: recentId } },
-      data: { updatedAt: new Date(Date.now() - 61 * DAY) },
-    });
+    const [recent] = await db
+      .select({ id: carts.id })
+      .from(carts)
+      .where(isNull(carts.userId))
+      .orderBy(desc(carts.createdAt))
+      .limit(1);
+    await db
+      .update(carts)
+      .set({ updatedAt: new Date(Date.now() - 61 * DAY) })
+      .where(ne(carts.id, recent!.id));
 
     const job = app.get(CartCleanupJob);
     expect(await job.run()).toBe(1);

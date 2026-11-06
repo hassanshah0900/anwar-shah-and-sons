@@ -14,19 +14,29 @@ import {
   type ReviewList,
   type ReviewListQuery,
 } from '@repo/shared';
-import { Prisma } from '../generated/prisma/client.js';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { and, count, desc, eq, gte, inArray } from 'drizzle-orm';
+import type { Database } from '../db/connection.js';
+import { InjectDatabase } from '../db/database.module.js';
+import { found, isUniqueViolation } from '../db/queries.js';
+import { orderItems, orders, products, reviews, users } from '../db/schema/index.js';
 
-const reviewSelect = {
-  id: true,
-  rating: true,
-  title: true,
-  body: true,
-  createdAt: true,
-  user: { select: { name: true } },
-} satisfies Prisma.ReviewSelect;
+const reviewColumns = {
+  id: reviews.id,
+  rating: reviews.rating,
+  title: reviews.title,
+  body: reviews.body,
+  createdAt: reviews.createdAt,
+  user: { name: users.name },
+};
 
-type ReviewRow = Prisma.ReviewGetPayload<{ select: typeof reviewSelect }>;
+type ReviewRow = {
+  id: string;
+  rating: number;
+  title: string | null;
+  body: string;
+  createdAt: Date;
+  user: { name: string };
+};
 
 function toReview(row: ReviewRow): Review {
   return {
@@ -42,23 +52,29 @@ function toReview(row: ReviewRow): Review {
 /** Reviews can only be written by customers who have received the product. */
 @Injectable()
 export class ReviewsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@InjectDatabase() private readonly db: Database) {}
 
   /** A page of an active product's reviews, newest first, with the rating spread. */
   async list(slug: string, query: ReviewListQuery): Promise<ReviewList> {
     const productId = await this.activeProductId(slug);
+    const ofProduct = eq(reviews.productId, productId);
     const [rows, total, counts] = await Promise.all([
-      this.prisma.review.findMany({
-        where: { productId },
-        select: reviewSelect,
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        take: query.pageSize,
-        skip: (query.page - 1) * query.pageSize,
-      }),
-      this.prisma.review.count({ where: { productId } }),
-      this.prisma.review.groupBy({ by: ['rating'], where: { productId }, _count: true }),
+      this.db
+        .select(reviewColumns)
+        .from(reviews)
+        .innerJoin(users, eq(users.id, reviews.userId))
+        .where(ofProduct)
+        .orderBy(desc(reviews.createdAt), desc(reviews.id))
+        .limit(query.pageSize)
+        .offset((query.page - 1) * query.pageSize),
+      this.db.$count(reviews, ofProduct),
+      this.db
+        .select({ rating: reviews.rating, count: count() })
+        .from(reviews)
+        .where(ofProduct)
+        .groupBy(reviews.rating),
     ]);
-    const byRating = new Map(counts.map((count) => [count.rating, count._count]));
+    const byRating = new Map(counts.map((row) => [row.rating, row.count]));
 
     return {
       reviews: rows.map(toReview),
@@ -84,20 +100,30 @@ export class ReviewsService {
     }
 
     try {
-      const row = await this.prisma.review.create({
-        data: {
-          productId,
-          userId,
-          rating: data.rating,
-          title: data.title ?? null,
-          body: data.body,
-        },
-        select: reviewSelect,
-      });
-      return toReview(row);
+      const { id } = found(
+        await this.db
+          .insert(reviews)
+          .values({
+            productId,
+            userId,
+            rating: data.rating,
+            title: data.title ?? null,
+            body: data.body,
+          })
+          .returning({ id: reviews.id }),
+      );
+      return toReview(
+        found(
+          await this.db
+            .select(reviewColumns)
+            .from(reviews)
+            .innerJoin(users, eq(users.id, reviews.userId))
+            .where(eq(reviews.id, id)),
+        ),
+      );
     } catch (error) {
       // Two submissions at once: the unique index lets only one through.
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (isUniqueViolation(error)) {
         throw new ConflictException('You have already reviewed this product.');
       }
       throw error;
@@ -106,29 +132,35 @@ export class ReviewsService {
 
   /** Recent four- and five-star reviews with written text, one per product. */
   async highlights(limit: number): Promise<ReviewHighlights> {
-    const rows = await this.prisma.review.findMany({
-      where: { rating: { gte: 4 }, product: { status: 'active' } },
-      select: {
-        ...reviewSelect,
+    const rows = await this.db.query.reviews.findMany({
+      where: and(
+        gte(reviews.rating, 4),
+        // Not correlated: Drizzle's relational queries alias the outer table.
+        inArray(
+          reviews.productId,
+          this.db.select({ id: products.id }).from(products).where(eq(products.status, 'active')),
+        ),
+      ),
+      columns: { id: true, rating: true, title: true, body: true, createdAt: true },
+      with: {
+        user: { columns: { name: true } },
         product: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
+          columns: { id: true, name: true, slug: true },
+          with: {
             images: {
-              select: { storageKey: true, alt: true },
-              orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
-              take: 1,
+              columns: { storageKey: true, alt: true },
+              orderBy: (image, { asc }) => [asc(image.position), asc(image.createdAt)],
+              limit: 1,
             },
           },
         },
       },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: limit * 5,
+      orderBy: [desc(reviews.createdAt), desc(reviews.id)],
+      limit: limit * 5,
     });
 
     const seen = new Set<string>();
-    const reviews = rows
+    const picked = rows
       .filter((row) => !seen.has(row.product.id) && seen.add(row.product.id))
       .slice(0, limit)
       .map((row) => {
@@ -142,25 +174,36 @@ export class ReviewsService {
           },
         };
       });
-    return { reviews };
+    return { reviews: picked };
   }
 
   /** Admins can take down a review; the product's rating follows. */
   async remove(id: string): Promise<void> {
-    const { count } = await this.prisma.review.deleteMany({ where: { id } });
-    if (count === 0) throw new NotFoundException('Review not found');
+    const deleted = await this.db
+      .delete(reviews)
+      .where(eq(reviews.id, id))
+      .returning({ id: reviews.id });
+    if (deleted.length === 0) throw new NotFoundException('Review not found');
   }
 
   private async check(productId: string, userId: string): Promise<ReviewEligibility> {
-    const [existing, delivered] = await Promise.all([
-      this.prisma.review.findUnique({
-        where: { productId_userId: { productId, userId } },
-        select: { id: true },
-      }),
-      this.prisma.orderItem.findFirst({
-        where: { productId, order: { userId, status: 'delivered' } },
-        select: { id: true },
-      }),
+    const [[existing], [delivered]] = await Promise.all([
+      this.db
+        .select({ id: reviews.id })
+        .from(reviews)
+        .where(and(eq(reviews.productId, productId), eq(reviews.userId, userId))),
+      this.db
+        .select({ id: orderItems.id })
+        .from(orderItems)
+        .innerJoin(orders, eq(orders.id, orderItems.orderId))
+        .where(
+          and(
+            eq(orderItems.productId, productId),
+            eq(orders.userId, userId),
+            eq(orders.status, 'delivered'),
+          ),
+        )
+        .limit(1),
     ]);
     if (existing) return { canReview: false, reason: 'already-reviewed' };
     if (!delivered) return { canReview: false, reason: 'not-purchased' };
@@ -168,10 +211,10 @@ export class ReviewsService {
   }
 
   private async activeProductId(slug: string): Promise<string> {
-    const product = await this.prisma.product.findFirst({
-      where: { slug, status: 'active' },
-      select: { id: true },
-    });
+    const [product] = await this.db
+      .select({ id: products.id })
+      .from(products)
+      .where(and(eq(products.slug, slug), eq(products.status, 'active')));
     if (!product) throw new NotFoundException('Product not found');
     return product.id;
   }

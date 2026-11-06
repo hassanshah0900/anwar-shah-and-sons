@@ -1,8 +1,8 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
-import { PrismaService } from '../../src/prisma/prisma.service.js';
 import { cookiesFrom, WEB_ORIGIN } from './app.js';
+import { makeAdmin, testDatabase } from './database.js';
 
 /** Signs up a user (optionally promoting them to admin) and returns their session cookies. */
 export async function signUpAs(
@@ -17,7 +17,7 @@ export async function signUpAs(
     .expect(200);
 
   if (role === 'admin') {
-    await app.get(PrismaService).user.update({ where: { email }, data: { role: 'admin' } });
+    await makeAdmin(testDatabase(app), email);
   }
   return cookiesFrom(response);
 }

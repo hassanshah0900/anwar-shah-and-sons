@@ -3,64 +3,80 @@ import { ConfigService } from '@nestjs/config';
 import { DASHBOARD_DAYS, LOW_STOCK_THRESHOLD, type Dashboard } from '@repo/shared';
 import type { Env } from '../config/env.js';
 import { OrdersService } from '../orders/orders.service.js';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { and, asc, desc, eq, inArray, lte, sql } from 'drizzle-orm';
+import type { Database } from '../db/connection.js';
+import { InjectDatabase } from '../db/database.module.js';
+import {
+  orders as ordersTable,
+  productOptions,
+  products,
+  productVariants,
+} from '../db/schema/index.js';
 
 const LOW_STOCK_LIMIT = 10;
 
-type DayRow = { day: string; orders: number; revenue: bigint };
+/** pg returns bigint sums as strings. */
+type DayRow = { day: string; orders: number; revenue: string };
 
 /** Figures for the admin overview. Read-only. */
 @Injectable()
 export class DashboardService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectDatabase() private readonly db: Database,
     private readonly config: ConfigService<Env, true>,
     private readonly orders: OrdersService,
   ) {}
 
   async overview(): Promise<Dashboard> {
     const timeZone = this.config.get('STORE_TIMEZONE', { infer: true });
-    const lowStockWhere = {
-      stock: { lte: LOW_STOCK_THRESHOLD },
-      product: { status: 'active' as const },
-    };
+    // Not correlated: Drizzle's relational queries alias the outer table, so a subquery
+    // can't refer back to it by name.
+    const lowStockWhere = and(
+      lte(productVariants.stock, LOW_STOCK_THRESHOLD),
+      inArray(
+        productVariants.productId,
+        this.db.select({ id: products.id }).from(products).where(eq(products.status, 'active')),
+      ),
+    );
 
     const [today, days, pendingOrders, toShip, refundsDue, lowStock, lowStockCount, recent] =
       await Promise.all([
         this.localToday(timeZone),
         this.dailyTotals(timeZone),
         // Unpaid card orders are the customer's next step, not the store's.
-        this.prisma.order.count({ where: { status: 'pending', paymentMethod: 'cod' } }),
-        this.prisma.order.count({ where: { status: 'confirmed' } }),
+        this.db.$count(
+          ordersTable,
+          and(eq(ordersTable.status, 'pending'), eq(ordersTable.paymentMethod, 'cod')),
+        ),
+        this.db.$count(ordersTable, eq(ordersTable.status, 'confirmed')),
         this.orders.countRefundsDue(),
-        this.prisma.productVariant.findMany({
+        this.db.query.productVariants.findMany({
           where: lowStockWhere,
-          orderBy: [{ stock: 'asc' }, { updatedAt: 'desc' }],
-          take: LOW_STOCK_LIMIT,
-          select: {
-            sku: true,
-            stock: true,
+          orderBy: [asc(productVariants.stock), desc(productVariants.updatedAt)],
+          limit: LOW_STOCK_LIMIT,
+          columns: { sku: true, stock: true },
+          with: {
             product: {
-              select: {
-                id: true,
-                name: true,
-                options: { select: { optionTypeId: true }, orderBy: { position: 'asc' } },
+              columns: { id: true, name: true },
+              with: {
+                options: {
+                  columns: { optionTypeId: true },
+                  orderBy: [asc(productOptions.position)],
+                },
               },
             },
             optionValues: {
-              select: {
+              columns: {},
+              with: {
                 optionValue: {
-                  select: {
-                    label: true,
-                    optionTypeId: true,
-                    optionType: { select: { name: true } },
-                  },
+                  columns: { label: true, optionTypeId: true },
+                  with: { optionType: { columns: { name: true } } },
                 },
               },
             },
           },
         }),
-        this.prisma.productVariant.count({ where: lowStockWhere }),
+        this.db.$count(productVariants, lowStockWhere),
         this.orders.listAll({ page: 1, pageSize: 5 }),
       ]);
 
@@ -108,9 +124,9 @@ export class DashboardService {
 
   /** Today's date in the store's time zone, as YYYY-MM-DD. */
   private async localToday(timeZone: string): Promise<string> {
-    const [row] = await this.prisma.$queryRaw<{ today: string }[]>`
-      SELECT to_char((now() AT TIME ZONE ${timeZone})::date, 'YYYY-MM-DD') AS today`;
-    return row!.today;
+    const { rows } = await this.db.execute<{ today: string }>(sql`
+      SELECT to_char((now() AT TIME ZONE ${timeZone})::date, 'YYYY-MM-DD') AS today`);
+    return rows[0]!.today;
   }
 
   /**
@@ -118,8 +134,8 @@ export class DashboardService {
    * card orders that haven't been paid.
    * created_at is stored in UTC, so it's converted to the store's zone first.
    */
-  private dailyTotals(timeZone: string): Promise<DayRow[]> {
-    return this.prisma.$queryRaw<DayRow[]>`
+  private async dailyTotals(timeZone: string): Promise<DayRow[]> {
+    const { rows } = await this.db.execute<DayRow>(sql`
       WITH local AS (
         SELECT (created_at AT TIME ZONE 'UTC' AT TIME ZONE ${timeZone})::date AS day, total
         FROM orders
@@ -128,7 +144,8 @@ export class DashboardService {
       SELECT to_char(day, 'YYYY-MM-DD') AS day, count(*)::int AS orders, sum(total)::bigint AS revenue
       FROM local
       WHERE day > (now() AT TIME ZONE ${timeZone})::date - ${DASHBOARD_DAYS}::int
-      GROUP BY day`;
+      GROUP BY day`);
+    return rows;
   }
 }
 

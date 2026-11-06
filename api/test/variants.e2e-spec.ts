@@ -1,11 +1,11 @@
 import { INestApplication } from '@nestjs/common';
 import { productSchema, type Product } from '@repo/shared';
 import { App } from 'supertest/types.js';
-import { PrismaService } from '../src/prisma/prisma.service.js';
 import { createTestApp } from './support/app.js';
 import { adminApi } from './support/catalog.js';
-import { resetCatalog } from './support/database.js';
 import { signUpAs } from './support/users.js';
+import { users } from '../src/db/schema/index.js';
+import { resetCatalog, testDatabase } from './support/database.js';
 
 describe('Admin product variants (e2e)', () => {
   let app: INestApplication<App>;
@@ -15,9 +15,9 @@ describe('Admin product variants (e2e)', () => {
 
   beforeAll(async () => {
     app = await createTestApp();
-    const prisma = app.get(PrismaService);
-    await resetCatalog(prisma);
-    await prisma.user.deleteMany();
+    const db = testDatabase(app);
+    await resetCatalog(db);
+    await db.delete(users);
     api = adminApi(app, await signUpAs(app, 'variants-admin@example.com', 'admin'));
 
     const categoryId = (await api.post('/categories', { name: 'Kurtas' }).expect(201)).body.id;
@@ -115,6 +115,20 @@ describe('Admin product variants (e2e)', () => {
     expect(product.variants[1]).toMatchObject({ stock: 12, price: 5490 });
 
     await api.patch(variants(`/${target.id}`), { stock: -1 }).expect(400);
+  });
+
+  it('counts variants and adds up their stock in the product list', async () => {
+    const list = (await api.get('/products').expect(200)).body;
+    const totalStock = product.variants.reduce((sum, variant) => sum + variant.stock, 0);
+
+    expect(totalStock).toBeGreaterThan(0);
+    expect(list.products).toEqual([
+      expect.objectContaining({
+        id: product.id,
+        variantCount: product.variants.length,
+        totalStock,
+      }),
+    ]);
   });
 
   it("locks the product's options once it has variants", async () => {

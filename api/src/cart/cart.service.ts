@@ -7,8 +7,12 @@ import {
   type CartMutation,
   type UpdateCartLine,
 } from '@repo/shared';
-import { PrismaService } from '../prisma/prisma.service.js';
-import { lineSelect, toLine } from './cart-line.js';
+import { and, eq, isNotNull, isNull, lt } from 'drizzle-orm';
+import type { Database } from '../db/connection.js';
+import { InjectDatabase } from '../db/database.module.js';
+import { found } from '../db/queries.js';
+import { cartItems, carts, products, productVariants } from '../db/schema/index.js';
+import { findCartLines, toLine } from './cart-line.js';
 
 /** Who is shopping: a signed-in customer, a guest holding a cart token, or both. */
 export type CartOwner = { userId?: string; token?: string };
@@ -23,7 +27,7 @@ const hashToken = (token: string) => createHash('sha256').update(token).digest('
  */
 @Injectable()
 export class CartService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@InjectDatabase() private readonly db: Database) {}
 
   async get(owner: CartOwner): Promise<Cart> {
     const resolved = await this.resolve(owner, false);
@@ -31,26 +35,25 @@ export class CartService {
   }
 
   async add(owner: CartOwner, input: AddToCart): Promise<CartMutation> {
-    const variant = await this.prisma.productVariant.findFirst({
-      where: { id: input.variantId, product: { status: 'active' } },
-      select: { stock: true },
-    });
+    const [variant] = await this.db
+      .select({ stock: productVariants.stock })
+      .from(productVariants)
+      .innerJoin(products, eq(products.id, productVariants.productId))
+      .where(and(eq(productVariants.id, input.variantId), eq(products.status, 'active')));
     if (!variant) throw new NotFoundException('This product is no longer available');
 
     const { cartId, token } = (await this.resolve(owner, true))!;
-    const key = { cartId_variantId: { cartId, variantId: input.variantId } };
-    const existing = await this.prisma.cartItem.findUnique({
-      where: key,
-      select: { quantity: true },
-    });
+    const [existing] = await this.db
+      .select({ quantity: cartItems.quantity })
+      .from(cartItems)
+      .where(lineOf(cartId, input.variantId));
     const quantity = (existing?.quantity ?? 0) + input.quantity;
     assertQuantity(quantity, variant.stock);
 
-    await this.prisma.cartItem.upsert({
-      where: key,
-      create: { cartId, variantId: input.variantId, quantity },
-      update: { quantity },
-    });
+    await this.db
+      .insert(cartItems)
+      .values({ cartId, variantId: input.variantId, quantity })
+      .onConflictDoUpdate({ target: [cartItems.cartId, cartItems.variantId], set: { quantity } });
     await this.touch(cartId);
     return { cart: await this.view(cartId), token };
   }
@@ -58,20 +61,29 @@ export class CartService {
   /** Sets a line's quantity; 0 removes it. Lowering is always allowed, raising checks stock. */
   async update(owner: CartOwner, variantId: string, { quantity }: UpdateCartLine): Promise<Cart> {
     const resolved = await this.resolve(owner, false);
-    const item =
-      resolved &&
-      (await this.prisma.cartItem.findUnique({
-        where: { cartId_variantId: { cartId: resolved.cartId, variantId } },
-        select: { quantity: true, variant: { select: { stock: true } } },
-      }));
+    const [item] = resolved
+      ? await this.db
+          .select({ quantity: cartItems.quantity, stock: productVariants.stock })
+          .from(cartItems)
+          .innerJoin(productVariants, eq(productVariants.id, cartItems.variantId))
+          .where(lineOf(resolved.cartId, variantId))
+      : [];
     if (!resolved || !item) throw new NotFoundException('This item is not in your cart');
 
-    const key = { cartId_variantId: { cartId: resolved.cartId, variantId } };
+    const line = lineOf(resolved.cartId, variantId);
     if (quantity === 0) {
-      await this.prisma.cartItem.delete({ where: key });
+      found(
+        await this.db.delete(cartItems).where(line).returning({ quantity: cartItems.quantity }),
+      );
     } else {
-      if (quantity > item.quantity) assertQuantity(quantity, item.variant.stock);
-      await this.prisma.cartItem.update({ where: key, data: { quantity } });
+      if (quantity > item.quantity) assertQuantity(quantity, item.stock);
+      found(
+        await this.db
+          .update(cartItems)
+          .set({ quantity })
+          .where(line)
+          .returning({ quantity: cartItems.quantity }),
+      );
     }
     await this.touch(resolved.cartId);
     return this.view(resolved.cartId);
@@ -81,7 +93,7 @@ export class CartService {
   async remove(owner: CartOwner, variantId: string): Promise<Cart> {
     const resolved = await this.resolve(owner, false);
     if (!resolved) return this.view(null);
-    await this.prisma.cartItem.deleteMany({ where: { cartId: resolved.cartId, variantId } });
+    await this.db.delete(cartItems).where(lineOf(resolved.cartId, variantId));
     await this.touch(resolved.cartId);
     return this.view(resolved.cartId);
   }
@@ -92,42 +104,50 @@ export class CartService {
    * token gets the guest cart's items added to theirs.
    */
   private async resolve(owner: CartOwner, create: boolean): Promise<ResolvedCart | null> {
-    const guest = owner.token
-      ? await this.prisma.cart.findUnique({
-          where: { tokenHash: hashToken(owner.token) },
-          select: { id: true },
-        })
-      : null;
+    const [guest] = owner.token
+      ? await this.db
+          .select({ id: carts.id })
+          .from(carts)
+          .where(eq(carts.tokenHash, hashToken(owner.token)))
+      : [];
 
     if (owner.userId) {
       const userId = owner.userId;
-      const own = await this.prisma.cart.findUnique({ where: { userId }, select: { id: true } });
+      const [own] = await this.db
+        .select({ id: carts.id })
+        .from(carts)
+        .where(eq(carts.userId, userId));
       // Another request may have just given this guest cart to the customer, making them
       // the same cart. Never merge a cart into itself: that would delete it.
       if (guest && own && guest.id !== own.id) {
         await this.merge(guest.id, own.id);
       } else if (guest && !own) {
         // No customer cart yet: the guest cart simply becomes theirs, if nobody beat us to it.
-        const { count } = await this.prisma.cart.updateMany({
-          where: { id: guest.id, tokenHash: { not: null } },
-          data: { userId, tokenHash: null },
-        });
-        if (count === 1) return { cartId: guest.id, token: null };
+        const claimed = await this.db
+          .update(carts)
+          .set({ userId, tokenHash: null, updatedAt: new Date() })
+          .where(and(eq(carts.id, guest.id), isNotNull(carts.tokenHash)))
+          .returning({ id: carts.id });
+        if (claimed.length === 1) return { cartId: guest.id, token: null };
         return this.resolve({ userId }, create);
       }
       if (own) return { cartId: own.id, token: null };
       if (!create) return null;
-      const cart = await this.prisma.cart.create({ data: { userId }, select: { id: true } });
+      const cart = found(
+        await this.db.insert(carts).values({ userId }).returning({ id: carts.id }),
+      );
       return { cartId: cart.id, token: null };
     }
 
     if (guest) return { cartId: guest.id, token: null };
     if (!create) return null;
     const token = randomBytes(32).toString('base64url');
-    const cart = await this.prisma.cart.create({
-      data: { tokenHash: hashToken(token) },
-      select: { id: true },
-    });
+    const cart = found(
+      await this.db
+        .insert(carts)
+        .values({ tokenHash: hashToken(token) })
+        .returning({ id: carts.id }),
+    );
     return { cartId: cart.id, token };
   }
 
@@ -137,23 +157,28 @@ export class CartService {
    * on it, then find nothing to delete and stop. Items only move once.
    */
   private async merge(fromId: string, intoId: string): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
-      const from = await tx.cartItem.findMany({ where: { cartId: fromId } });
-      const { count } = await tx.cart.deleteMany({ where: { id: fromId } });
-      if (count === 0) return;
+    await this.db.transaction(async (tx) => {
+      const from = await tx.select().from(cartItems).where(eq(cartItems.cartId, fromId));
+      const deleted = await tx
+        .delete(carts)
+        .where(eq(carts.id, fromId))
+        .returning({ id: carts.id });
+      if (deleted.length === 0) return;
 
-      const into = await tx.cartItem.findMany({ where: { cartId: intoId } });
+      const into = await tx.select().from(cartItems).where(eq(cartItems.cartId, intoId));
       const held = new Map(into.map((item) => [item.variantId, item.quantity]));
       for (const item of from) {
         const quantity = Math.min(
           (held.get(item.variantId) ?? 0) + item.quantity,
           MAX_LINE_QUANTITY,
         );
-        await tx.cartItem.upsert({
-          where: { cartId_variantId: { cartId: intoId, variantId: item.variantId } },
-          create: { cartId: intoId, variantId: item.variantId, quantity },
-          update: { quantity },
-        });
+        await tx
+          .insert(cartItems)
+          .values({ cartId: intoId, variantId: item.variantId, quantity })
+          .onConflictDoUpdate({
+            target: [cartItems.cartId, cartItems.variantId],
+            set: { quantity },
+          });
       }
     });
   }
@@ -163,26 +188,28 @@ export class CartService {
    * carts are never removed. Safe to run more than once, or on several servers.
    */
   async deleteStaleGuestCarts(cutoff: Date): Promise<number> {
-    const { count } = await this.prisma.cart.deleteMany({
-      where: { userId: null, updatedAt: { lt: cutoff } },
-    });
-    return count;
+    const deleted = await this.db
+      .delete(carts)
+      .where(and(isNull(carts.userId), lt(carts.updatedAt, cutoff)))
+      .returning({ id: carts.id });
+    return deleted.length;
   }
 
   /** Records activity, so abandoned guest carts can be found and cleared later. */
   private async touch(cartId: string): Promise<void> {
-    await this.prisma.cart.update({ where: { id: cartId }, data: { updatedAt: new Date() } });
+    found(
+      await this.db
+        .update(carts)
+        .set({ updatedAt: new Date() })
+        .where(eq(carts.id, cartId))
+        .returning({ id: carts.id }),
+    );
   }
 
   private async view(cartId: string | null): Promise<Cart> {
     if (!cartId) return { lines: [], itemCount: 0, subtotal: 0 };
 
-    const rows = await this.prisma.cartItem.findMany({
-      where: { cartId },
-      select: lineSelect,
-      orderBy: { createdAt: 'asc' },
-    });
-    const lines = rows.map(toLine);
+    const lines = (await findCartLines(this.db, cartId)).map(toLine);
     return {
       lines,
       itemCount: lines.reduce((sum, line) => sum + line.quantity, 0),
@@ -192,6 +219,11 @@ export class CartService {
         .reduce((sum, line) => sum + line.lineTotal, 0),
     };
   }
+}
+
+/** The cart's line for this variant. */
+function lineOf(cartId: string, variantId: string) {
+  return and(eq(cartItems.cartId, cartId), eq(cartItems.variantId, variantId));
 }
 
 function assertQuantity(quantity: number, stock: number): void {

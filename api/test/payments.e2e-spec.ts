@@ -17,11 +17,13 @@ import {
   type PaymentSession,
 } from '../src/payments/payment-gateway.js';
 import { StripeGateway } from '../src/payments/stripe-gateway.js';
-import { PrismaService } from '../src/prisma/prisma.service.js';
 import { createTestApp, WEB_ORIGIN } from './support/app.js';
 import { adminApi } from './support/catalog.js';
-import { resetCatalog } from './support/database.js';
 import { signUpAs } from './support/users.js';
+import { eq } from 'drizzle-orm';
+import type { Database } from '../src/db/connection.js';
+import { carts, orders, users } from '../src/db/schema/index.js';
+import { resetCatalog, stockOf, testDatabase, variantOf } from './support/database.js';
 
 const WEBHOOK_SECRET = 'whsec_e2e'; // vitest.config.e2e.ts
 const SHIPPING = 250; // vitest.config.e2e.ts
@@ -90,7 +92,7 @@ class FakeStripe extends StripeGateway {
 
 describe('Card payments (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let db: Database;
   let admin: ReturnType<typeof adminApi>;
   let stripe: FakeStripe;
   let productId: string;
@@ -153,20 +155,23 @@ describe('Card payments (e2e)', () => {
   const paid = (sessionId: string) => webhook('checkout.session.completed', sessionId).expect(200);
   const expired = (sessionId: string) => webhook('checkout.session.expired', sessionId).expect(200);
 
-  const stock = async () =>
-    (await prisma.productVariant.findUniqueOrThrow({ where: { id: variantId } })).stock;
-  const stored = (number: number) => prisma.order.findUniqueOrThrow({ where: { number } });
+  const stock = async () => stockOf(db, variantId);
+  const stored = async (number: number) => {
+    const [order] = await db.select().from(orders).where(eq(orders.number, number));
+    if (!order) throw new Error(`No order #${number}`);
+    return order;
+  };
 
   beforeAll(async () => {
     stripe = new FakeStripe();
     app = await createTestApp((builder) =>
       builder.overrideProvider(PaymentGateway).useValue(stripe),
     );
-    prisma = app.get(PrismaService);
-    await prisma.order.deleteMany();
-    await prisma.cart.deleteMany();
-    await resetCatalog(prisma);
-    await prisma.user.deleteMany();
+    db = testDatabase(app);
+    await db.delete(orders);
+    await db.delete(carts);
+    await resetCatalog(db);
+    await db.delete(users);
     admin = adminApi(app, await signUpAs(app, 'payments-admin@example.com', 'admin'));
 
     const categoryId = (await admin.post('/categories', { name: 'Shirts' }).expect(201)).body.id;
@@ -187,7 +192,7 @@ describe('Card payments (e2e)', () => {
         optionValueIds: [valueId],
       })
       .expect(201);
-    variantId = (await prisma.productVariant.findFirstOrThrow({ where: { productId } })).id;
+    variantId = (await variantOf(db, productId)).id;
     await admin.patch(`/products/${productId}`, { status: 'active' }).expect(200);
   });
 
@@ -421,7 +426,7 @@ describe('Card payments (e2e)', () => {
   });
 
   it('flags a failed refund for the admin, and retrying it refunds and emails once', async () => {
-    await prisma.order.deleteMany();
+    await db.delete(orders);
     const dashboard = async () => (await admin.get('/dashboard').expect(200)).body;
     const { shopper, number, sessionId } = await placeCardOrder();
     await admin.post(`/orders/${number}/refund`, {}).expect(409); // Not paid, nothing to refund.
@@ -467,7 +472,7 @@ describe('Card payments (e2e)', () => {
   });
 
   it('leaves unpaid card orders out of the dashboard until they’re paid', async () => {
-    await prisma.order.deleteMany();
+    await db.delete(orders);
     const figures = async () => (await admin.get('/dashboard').expect(200)).body;
 
     const { sessionId } = await placeCardOrder();
@@ -481,10 +486,10 @@ describe('Card payments (e2e)', () => {
   it('settles overdue orders whose webhooks never came, and only those', async () => {
     const job = app.get(OrderPaymentsJob);
     const age = (number: number) =>
-      prisma.order.update({
-        where: { number },
-        data: { createdAt: new Date(Date.now() - 66 * MINUTE) },
-      });
+      db
+        .update(orders)
+        .set({ createdAt: new Date(Date.now() - 66 * MINUTE) })
+        .where(eq(orders.number, number));
 
     const unpaid = await placeCardOrder();
     const payer = await placeCardOrder();
@@ -492,10 +497,7 @@ describe('Card payments (e2e)', () => {
     const recent = await placeCardOrder();
     stripe.expire(unpaid.sessionId);
     stripe.pay(payer.sessionId);
-    await prisma.order.update({
-      where: { number: crashed.number },
-      data: { stripeSessionId: null },
-    });
+    await db.update(orders).set({ stripeSessionId: null }).where(eq(orders.number, crashed.number));
     await Promise.all([unpaid, payer, crashed].map(({ number }) => age(number)));
     const held = await stock();
 

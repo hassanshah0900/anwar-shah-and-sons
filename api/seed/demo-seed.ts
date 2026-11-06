@@ -14,9 +14,10 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { shippingFor, toMinorUnits } from '@repo/shared';
 import { createAuth } from '../src/auth/auth.js';
+import { and, asc, eq, inArray, like } from 'drizzle-orm';
 import { validateEnv, type Env } from '../src/config/env.js';
-import { PrismaClient } from '../src/generated/prisma/client.js';
-import { createPrismaAdapter } from '../src/prisma/prisma-adapter.js';
+import { createDatabase, createPool, type Database } from '../src/db/connection.js';
+import * as schema from '../src/db/schema/index.js';
 import { LocalStorageService } from '../src/storage/local-storage.service.js';
 import { S3StorageService } from '../src/storage/s3-storage.service.js';
 import type { StorageService } from '../src/storage/storage.js';
@@ -68,6 +69,20 @@ function storageFor(env: Env): StorageService {
     : new LocalStorageService(env.STORAGE_LOCAL_DIR);
 }
 
+/** The option type with this slug, created if it doesn't exist yet. */
+async function optionType(db: Database, values: typeof schema.optionTypes.$inferInsert) {
+  const [existing] = await db
+    .select({ id: schema.optionTypes.id })
+    .from(schema.optionTypes)
+    .where(eq(schema.optionTypes.slug, values.slug));
+  if (existing) return existing;
+  const [created] = await db
+    .insert(schema.optionTypes)
+    .values(values)
+    .returning({ id: schema.optionTypes.id });
+  return created!;
+}
+
 async function main() {
   const env = validateEnv(process.env);
   if (env.NODE_ENV === 'production' && !process.argv.includes('--force')) {
@@ -76,66 +91,80 @@ async function main() {
     );
   }
 
-  const prisma = new PrismaClient({ adapter: createPrismaAdapter(env.DATABASE_URL) });
+  const pool = createPool(env.DATABASE_URL);
+  const db = createDatabase(pool);
   const storage = storageFor(env);
   const rng = random(20261104);
 
   try {
     // ─── Options ───────────────────────────────────────────────────────────
-    const colourType =
-      (await prisma.optionType.findUnique({ where: { slug: 'colour' } })) ??
-      (await prisma.optionType.create({
-        data: { name: 'Colour', slug: 'colour', kind: 'color', position: 0 },
-      }));
-    const sizeType =
-      (await prisma.optionType.findUnique({ where: { slug: 'size' } })) ??
-      (await prisma.optionType.create({
-        data: { name: 'Size', slug: 'size', kind: 'text', position: 1 },
-      }));
+    const colourType = await optionType(db, {
+      name: 'Colour',
+      slug: 'colour',
+      kind: 'color',
+      position: 0,
+    });
+    const sizeType = await optionType(db, {
+      name: 'Size',
+      slug: 'size',
+      kind: 'text',
+      position: 1,
+    });
 
     const colourIds = new Map<string, string>();
     for (const [position, colour] of colours.entries()) {
-      const value = await prisma.optionValue.upsert({
-        where: { optionTypeId_slug: { optionTypeId: colourType.id, slug: colour.slug } },
-        create: {
+      const [value] = await db
+        .insert(schema.optionValues)
+        .values({
           optionTypeId: colourType.id,
           slug: colour.slug,
           label: colour.label,
           colorHex: colour.hex,
           position,
-        },
-        update: {},
-      });
-      colourIds.set(colour.slug, value.id);
+        })
+        .onConflictDoUpdate({
+          target: [schema.optionValues.optionTypeId, schema.optionValues.slug],
+          // Changes nothing, but makes the existing row come back.
+          set: { slug: colour.slug },
+        })
+        .returning({ id: schema.optionValues.id });
+      colourIds.set(colour.slug, value!.id);
     }
 
     const sizeIds = new Map<string, string>();
     for (const [position, label] of [...adultSizes, ...kidsSizes].entries()) {
       const slug = slugify(label);
-      const value = await prisma.optionValue.upsert({
-        where: { optionTypeId_slug: { optionTypeId: sizeType.id, slug } },
-        create: { optionTypeId: sizeType.id, slug, label, position },
-        update: { position },
-      });
-      sizeIds.set(label, value.id);
+      const [value] = await db
+        .insert(schema.optionValues)
+        .values({ optionTypeId: sizeType.id, slug, label, position })
+        .onConflictDoUpdate({
+          target: [schema.optionValues.optionTypeId, schema.optionValues.slug],
+          set: { position },
+        })
+        .returning({ id: schema.optionValues.id });
+      sizeIds.set(label, value!.id);
     }
 
     // ─── Categories ────────────────────────────────────────────────────────
     const categoryIds = new Map<string, string>();
     for (const [position, spec] of categories.entries()) {
-      const existing = await prisma.category.findUnique({ where: { slug: spec.slug } });
-      const category =
-        existing ??
-        (await prisma.category.create({
-          data: {
-            name: spec.name,
-            slug: spec.slug,
-            description: spec.description,
-            position,
-            parentId: spec.parent ? categoryIds.get(spec.parent) : null,
-          },
-        }));
-      categoryIds.set(spec.slug, category.id);
+      const [existing] = await db
+        .select({ id: schema.categories.id })
+        .from(schema.categories)
+        .where(eq(schema.categories.slug, spec.slug));
+      const [category] = existing
+        ? [existing]
+        : await db
+            .insert(schema.categories)
+            .values({
+              name: spec.name,
+              slug: spec.slug,
+              description: spec.description,
+              position,
+              parentId: spec.parent ? categoryIds.get(spec.parent) : null,
+            })
+            .returning({ id: schema.categories.id });
+      categoryIds.set(spec.slug, category!.id);
     }
 
     // ─── Products ──────────────────────────────────────────────────────────
@@ -148,24 +177,27 @@ async function main() {
       const hex = createHash('sha256').update(`demo-photo:${slug}`).digest('hex');
       const uuid = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
       const key = `products/${productId}/${uuid}.webp`;
-      if (await prisma.productImage.findFirst({ where: { productId, storageKey: key } })) {
+      const images = schema.productImages;
+      if (
+        await db.$count(images, and(eq(images.productId, productId), eq(images.storageKey, key)))
+      ) {
         return false;
       }
-      const old = await prisma.productImage.findMany({ where: { productId } });
-      await prisma.productImage.deleteMany({ where: { productId } });
+      const old = await db
+        .delete(images)
+        .where(eq(images.productId, productId))
+        .returning({ storageKey: images.storageKey });
       await Promise.all(old.map((image) => storage.delete(image.storageKey)));
 
       const body = await readFile(new URL(`./demo/photos/${slug}.webp`, import.meta.url));
       await storage.put(key, body, 'image/webp');
-      await prisma.productImage.create({
-        data: {
-          productId,
-          storageKey: key,
-          contentType: 'image/webp',
-          size: body.length,
-          alt: name,
-          position: 0,
-        },
+      await db.insert(images).values({
+        productId,
+        storageKey: key,
+        contentType: 'image/webp',
+        size: body.length,
+        alt: name,
+        position: 0,
       });
       return true;
     };
@@ -173,7 +205,10 @@ async function main() {
     let created = 0;
     let photographed = 0;
     for (const [index, spec] of products.entries()) {
-      const existing = await prisma.product.findUnique({ where: { slug: spec.slug } });
+      const [existing] = await db
+        .select({ id: schema.products.id })
+        .from(schema.products)
+        .where(eq(schema.products.slug, spec.slug));
       if (existing) {
         if (await usePhoto(existing.id, spec.slug, spec.name)) photographed++;
         continue;
@@ -181,8 +216,9 @@ async function main() {
 
       // Spread over the last six weeks, so "Newest" has an order to it.
       const createdAt = new Date(Date.now() - (products.length - index) * 2.3 * DAY);
-      const product = await prisma.product.create({
-        data: {
+      const [product] = await db
+        .insert(schema.products)
+        .values({
           name: spec.name,
           slug: spec.slug,
           description: spec.description,
@@ -193,14 +229,15 @@ async function main() {
             ? toMinorUnits(spec.compareAtPrice, env.STORE_CURRENCY)
             : null,
           createdAt,
-          options: {
-            create: [
-              { optionTypeId: colourType.id, position: 0 },
-              ...(spec.sizes ? [{ optionTypeId: sizeType.id, position: 1 }] : []),
-            ],
-          },
-        },
-      });
+        })
+        .returning({ id: schema.products.id });
+      const productId = product!.id;
+      await db
+        .insert(schema.productOptions)
+        .values([
+          { productId, optionTypeId: colourType.id, position: 0 },
+          ...(spec.sizes ? [{ productId, optionTypeId: sizeType.id, position: 1 }] : []),
+        ]);
 
       let position = 0;
       for (const colour of spec.colours) {
@@ -209,20 +246,23 @@ async function main() {
           // Mostly in stock, a few running low or sold out.
           const roll = rng.next();
           const stock = roll < 0.04 ? 0 : roll < 0.1 ? rng.int(1, 3) : rng.int(6, 30);
-          await prisma.productVariant.create({
-            data: {
-              productId: product.id,
+          const [variant] = await db
+            .insert(schema.productVariants)
+            .values({
+              productId,
               sku: [spec.slug, colour, size].filter(Boolean).join('-').toUpperCase(),
               stock,
               position: position++,
               combinationKey: [...valueIds].sort().join('+'),
-              optionValues: { create: valueIds.map((optionValueId) => ({ optionValueId })) },
-            },
-          });
+            })
+            .returning({ id: schema.productVariants.id });
+          await db
+            .insert(schema.variantOptionValues)
+            .values(valueIds.map((optionValueId) => ({ variantId: variant!.id, optionValueId })));
         }
       }
 
-      await usePhoto(product.id, spec.slug, spec.name);
+      await usePhoto(productId, spec.slug, spec.name);
       created++;
     }
     console.log(
@@ -231,29 +271,31 @@ async function main() {
     );
 
     // ─── Customers ─────────────────────────────────────────────────────────
-    const auth = createAuth(prisma, env);
+    const auth = createAuth(db, env);
     const shoppers: { id: string; email: string; name: string; city: string; line1: string }[] = [];
     for (const [index, person] of customers.entries()) {
       const email = `${slugify(person.name).replace('-', '.')}@${DEMO_EMAIL_DOMAIN}`;
-      let user = await prisma.user.findUnique({ where: { email } });
+      let [user] = await db
+        .select({ id: schema.users.id })
+        .from(schema.users)
+        .where(eq(schema.users.email, email));
       if (!user) {
         await auth.api.signUpEmail({ body: { name: person.name, email, password: DEMO_PASSWORD } });
-        user = await prisma.user.update({
-          where: { email },
-          data: { createdAt: new Date(Date.now() - (ORDER_DAYS + 10 - index * 5) * DAY) },
-        });
-        await prisma.address.create({
-          data: {
-            userId: user.id,
-            fullName: person.name,
-            phone: `+92 30${rng.int(0, 4)} ${rng.int(1_000_000, 9_999_999)}`,
-            line1: person.line1,
-            city: person.city,
-            isDefault: true,
-          },
+        [user] = await db
+          .update(schema.users)
+          .set({ createdAt: new Date(Date.now() - (ORDER_DAYS + 10 - index * 5) * DAY) })
+          .where(eq(schema.users.email, email))
+          .returning({ id: schema.users.id });
+        await db.insert(schema.addresses).values({
+          userId: user!.id,
+          fullName: person.name,
+          phone: `+92 30${rng.int(0, 4)} ${rng.int(1_000_000, 9_999_999)}`,
+          line1: person.line1,
+          city: person.city,
+          isDefault: true,
         });
       }
-      shoppers.push({ id: user.id, email, ...person });
+      shoppers.push({ id: user!.id, email, ...person });
     }
     console.log(`Customers: ${shoppers.length} (password: ${DEMO_PASSWORD})`);
 
@@ -263,29 +305,32 @@ async function main() {
     const reviewRng = random(20261106);
     let reviewed = 0;
     for (const spec of products) {
-      const product = await prisma.product.findUniqueOrThrow({
-        where: { slug: spec.slug },
-        select: { id: true, reviewCount: true, createdAt: true },
-      });
-      const pool = demoReviews[spec.category] ?? [];
-      if (product.reviewCount > 0 || pool.length === 0) continue;
+      const [product] = await db
+        .select({
+          id: schema.products.id,
+          reviewCount: schema.products.reviewCount,
+          createdAt: schema.products.createdAt,
+        })
+        .from(schema.products)
+        .where(eq(schema.products.slug, spec.slug));
+      if (!product) throw new Error(`Product ${spec.slug} is missing`);
+      const texts = demoReviews[spec.category] ?? [];
+      if (product.reviewCount > 0 || texts.length === 0) continue;
 
-      const count = Math.min(reviewRng.int(2, 5), shoppers.length, pool.length);
+      const count = Math.min(reviewRng.int(2, 5), shoppers.length, texts.length);
       const authors = [...shoppers].sort(() => reviewRng.next() - 0.5).slice(0, count);
-      const texts = [...pool].sort(() => reviewRng.next() - 0.5);
+      const shuffled = [...texts].sort(() => reviewRng.next() - 0.5);
       for (const [index, author] of authors.entries()) {
-        const text = texts[index]!;
+        const text = shuffled[index]!;
         // Some days after the product appeared, never in the future.
         const age = Date.now() - product.createdAt.getTime();
-        await prisma.review.create({
-          data: {
-            productId: product.id,
-            userId: author.id,
-            rating: text.rating,
-            title: text.title ?? null,
-            body: text.body,
-            createdAt: new Date(product.createdAt.getTime() + reviewRng.next() * age),
-          },
+        await db.insert(schema.reviews).values({
+          productId: product.id,
+          userId: author.id,
+          rating: text.rating,
+          title: text.title ?? null,
+          body: text.body,
+          createdAt: new Date(product.createdAt.getTime() + reviewRng.next() * age),
         });
       }
       reviewed++;
@@ -293,38 +338,46 @@ async function main() {
     console.log(`Reviews: ${reviewed} products reviewed`);
 
     // ─── Orders ────────────────────────────────────────────────────────────
-    const existingOrders = await prisma.order.count({
-      where: { email: { endsWith: `@${DEMO_EMAIL_DOMAIN}` } },
-    });
+    const existingOrders = await db.$count(
+      schema.orders,
+      like(schema.orders.email, `%@${DEMO_EMAIL_DOMAIN}`),
+    );
     if (existingOrders > 0) {
       console.log(`Orders: ${existingOrders} demo orders already there`);
       return;
     }
 
-    const variants = await prisma.productVariant.findMany({
-      where: { product: { slug: { in: products.map((spec) => spec.slug) } } },
-      select: {
-        id: true,
-        sku: true,
-        price: true,
+    const variants = await db.query.productVariants.findMany({
+      where: inArray(
+        schema.productVariants.productId,
+        db
+          .select({ id: schema.products.id })
+          .from(schema.products)
+          .where(
+            inArray(
+              schema.products.slug,
+              products.map((spec) => spec.slug),
+            ),
+          ),
+      ),
+      columns: { id: true, sku: true, price: true },
+      with: {
         product: {
-          select: {
-            id: true,
-            name: true,
-            price: true,
-            options: { select: { optionTypeId: true }, orderBy: { position: 'asc' } },
-            images: { select: { storageKey: true, optionValueId: true } },
+          columns: { id: true, name: true, price: true },
+          with: {
+            options: {
+              columns: { optionTypeId: true },
+              orderBy: [asc(schema.productOptions.position)],
+            },
+            images: { columns: { storageKey: true, optionValueId: true } },
           },
         },
         optionValues: {
-          select: {
+          columns: {},
+          with: {
             optionValue: {
-              select: {
-                id: true,
-                label: true,
-                optionTypeId: true,
-                optionType: { select: { name: true } },
-              },
+              columns: { id: true, label: true, optionTypeId: true },
+              with: { optionType: { columns: { name: true } } },
             },
           },
         },
@@ -403,8 +456,9 @@ async function main() {
       const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
       const shippingCharge = shippingFor(subtotal, shipping);
 
-      await prisma.order.create({
-        data: {
+      const [order] = await db
+        .insert(schema.orders)
+        .values({
           userId: shopper.id,
           email: shopper.email,
           status,
@@ -420,13 +474,15 @@ async function main() {
           city: shopper.city,
           createdAt,
           updatedAt: createdAt,
-          items: { create: items },
-        },
-      });
+        })
+        .returning({ id: schema.orders.id });
+      await db
+        .insert(schema.orderItems)
+        .values(items.map((item) => ({ ...item, orderId: order!.id })));
     }
     console.log(`Orders: ${ORDER_COUNT} added over the last ${ORDER_DAYS} days`);
   } finally {
-    await prisma.$disconnect();
+    await pool.end();
   }
 }
 
