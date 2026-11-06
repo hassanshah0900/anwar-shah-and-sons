@@ -1,9 +1,10 @@
 import { ADMIN_ROLE, DEFAULT_ROLE, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@repo/shared';
 import { betterAuth } from 'better-auth';
-import { prismaAdapter } from 'better-auth/adapters/prisma';
+import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { admin } from 'better-auth/plugins/admin';
 import type { Env } from '../config/env.js';
-import type { PrismaClient } from '../generated/prisma/client.js';
+import type { Database } from '../db/connection.js';
+import { accounts, sessions, users, verifications } from '../db/schema/index.js';
 import type { Mailer } from '../mail/mailer.js';
 import { passwordResetEmail } from '../mail/templates.js';
 
@@ -11,9 +12,9 @@ type AuthEnv = Pick<Env, 'BETTER_AUTH_SECRET' | 'BETTER_AUTH_URL' | 'CORS_ORIGIN
 
 /**
  * Builds the Better Auth instance. Kept as a factory so the Nest module, the
- * seed script and tests all create it the same way from their own Prisma client.
+ * seed script and tests all create it the same way from their own database client.
  */
-export function createAuth(prisma: PrismaClient, env: AuthEnv, mailer?: Mailer) {
+export function createAuth(db: Database, env: AuthEnv, mailer?: Mailer) {
   return betterAuth({
     appName: 'Anwar Shah & Sons',
     baseURL: env.BETTER_AUTH_URL,
@@ -21,7 +22,10 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv, mailer?: Mailer) 
     secret: env.BETTER_AUTH_SECRET,
     // Requests that change state must come from the web app (CSRF protection).
     trustedOrigins: [env.CORS_ORIGIN],
-    database: prismaAdapter(prisma, { provider: 'postgresql' }),
+    database: drizzleAdapter(db, {
+      provider: 'pg',
+      schema: { user: users, session: sessions, account: accounts, verification: verifications },
+    }),
     emailAndPassword: {
       enabled: true,
       minPasswordLength: PASSWORD_MIN_LENGTH,

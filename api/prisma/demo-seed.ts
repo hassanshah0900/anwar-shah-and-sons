@@ -14,6 +14,7 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { shippingFor, toMinorUnits } from '@repo/shared';
 import { createAuth } from '../src/auth/auth.js';
+import { createDatabase, createPool } from '../src/db/connection.js';
 import { validateEnv, type Env } from '../src/config/env.js';
 import { PrismaClient } from '../src/generated/prisma/client.js';
 import { createPrismaAdapter } from '../src/prisma/prisma-adapter.js';
@@ -77,6 +78,8 @@ async function main() {
   }
 
   const prisma = new PrismaClient({ adapter: createPrismaAdapter(env.DATABASE_URL) });
+  // Better Auth goes through Drizzle; the rest of this script still uses Prisma.
+  const pool = createPool(env.DATABASE_URL);
   const storage = storageFor(env);
   const rng = random(20261104);
 
@@ -231,7 +234,7 @@ async function main() {
     );
 
     // ─── Customers ─────────────────────────────────────────────────────────
-    const auth = createAuth(prisma, env);
+    const auth = createAuth(createDatabase(pool), env);
     const shoppers: { id: string; email: string; name: string; city: string; line1: string }[] = [];
     for (const [index, person] of customers.entries()) {
       const email = `${slugify(person.name).replace('-', '.')}@${DEMO_EMAIL_DOMAIN}`;
@@ -427,6 +430,7 @@ async function main() {
     console.log(`Orders: ${ORDER_COUNT} added over the last ${ORDER_DAYS} days`);
   } finally {
     await prisma.$disconnect();
+    await pool.end();
   }
 }
 
