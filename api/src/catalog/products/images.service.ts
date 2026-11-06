@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   MAX_IMAGE_BYTES,
   MAX_PRODUCT_IMAGES,
@@ -7,10 +7,14 @@ import {
 } from '@repo/shared';
 import { randomUUID } from 'node:crypto';
 import { invalidField } from '../../common/zod-validation.pipe.js';
-import { PrismaService } from '../../prisma/prisma.service.js';
+import { and, eq, exists } from 'drizzle-orm';
+import type { Database } from '../../db/connection.js';
+import { InjectDatabase } from '../../db/database.module.js';
+import { found, nextPosition, orNotFound } from '../../db/queries.js';
+import { optionValues, productImages, productOptions, products } from '../../db/schema/index.js';
 import { detectImageType } from '../../storage/image-type.js';
 import { extensionFor, StorageService } from '../../storage/storage.js';
-import { productSelect, toProduct } from './product.mapper.js';
+import { findProduct } from './product.mapper.js';
 
 export type ImageUpload = { buffer: Buffer; alt?: string; optionValueId?: string | null };
 
@@ -19,16 +23,19 @@ export class ImagesService {
   private readonly logger = new Logger(ImagesService.name);
 
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectDatabase() private readonly db: Database,
     private readonly storage: StorageService,
   ) {}
 
   async upload(productId: string, upload: ImageUpload): Promise<Product> {
-    const product = await this.prisma.product.findUniqueOrThrow({
-      where: { id: productId },
-      select: { _count: { select: { images: true } } },
-    });
-    if (product._count.images >= MAX_PRODUCT_IMAGES) {
+    orNotFound(
+      await this.db.query.products.findFirst({
+        where: eq(products.id, productId),
+        columns: { id: true },
+      }),
+    );
+    const imageCount = await this.db.$count(productImages, eq(productImages.productId, productId));
+    if (imageCount >= MAX_PRODUCT_IMAGES) {
       throw new BadRequestException(`A product can have at most ${MAX_PRODUCT_IMAGES} images`);
     }
     if (upload.buffer.length > MAX_IMAGE_BYTES) {
@@ -43,20 +50,18 @@ export class ImagesService {
     await this.storage.put(storageKey, upload.buffer, contentType);
 
     try {
-      const last = await this.prisma.productImage.aggregate({
-        where: { productId },
-        _max: { position: true },
-      });
-      await this.prisma.productImage.create({
-        data: {
-          productId,
-          storageKey,
-          contentType,
-          size: upload.buffer.length,
-          alt: upload.alt?.trim() ?? '',
-          position: (last._max.position ?? -1) + 1,
-          optionValueId: upload.optionValueId ?? null,
-        },
+      await this.db.insert(productImages).values({
+        productId,
+        storageKey,
+        contentType,
+        size: upload.buffer.length,
+        alt: upload.alt?.trim() ?? '',
+        position: await nextPosition(
+          this.db,
+          productImages,
+          eq(productImages.productId, productId),
+        ),
+        optionValueId: upload.optionValueId ?? null,
       });
     } catch (error) {
       // Don't leave a stored file without a record.
@@ -64,26 +69,43 @@ export class ImagesService {
       throw error;
     }
 
-    return this.product(productId);
+    return findProduct(this.db, productId);
   }
 
   async update(productId: string, imageId: string, input: ProductImageUpdate): Promise<Product> {
     if (input.optionValueId) await this.assertOptionValue(productId, input.optionValueId);
 
-    await this.prisma.productImage.update({
-      where: { id: imageId, productId },
-      data: { alt: input.alt, position: input.position, optionValueId: input.optionValueId },
-    });
-    return this.product(productId);
+    const changes = {
+      alt: input.alt,
+      position: input.position,
+      optionValueId: input.optionValueId,
+    };
+    const thisImage = and(eq(productImages.id, imageId), eq(productImages.productId, productId));
+    // Drizzle refuses an update with nothing to set, so an empty one only checks the image exists.
+    if (Object.values(changes).every((value) => value === undefined)) {
+      if (!(await this.db.$count(productImages, thisImage)))
+        throw new NotFoundException('Not found');
+    } else {
+      found(
+        await this.db
+          .update(productImages)
+          .set(changes)
+          .where(thisImage)
+          .returning({ id: productImages.id }),
+      );
+    }
+    return findProduct(this.db, productId);
   }
 
   async remove(productId: string, imageId: string): Promise<Product> {
-    const image = await this.prisma.productImage.delete({
-      where: { id: imageId, productId },
-      select: { storageKey: true },
-    });
+    const image = found(
+      await this.db
+        .delete(productImages)
+        .where(and(eq(productImages.id, imageId), eq(productImages.productId, productId)))
+        .returning({ storageKey: productImages.storageKey }),
+    );
     await this.deleteStored([image.storageKey]);
-    return this.product(productId);
+    return findProduct(this.db, productId);
   }
 
   /**
@@ -101,15 +123,23 @@ export class ImagesService {
 
   /** The value must belong to one of the product's options. */
   private async assertOptionValue(productId: string, optionValueId: string): Promise<void> {
-    const found = await this.prisma.optionValue.count({
-      where: { id: optionValueId, optionType: { products: { some: { productId } } } },
-    });
-    if (!found) throw invalidField('optionValueId', "Choose one of the product's option values");
-  }
-
-  private async product(id: string): Promise<Product> {
-    return toProduct(
-      await this.prisma.product.findUniqueOrThrow({ where: { id }, select: productSelect }),
+    const count = await this.db.$count(
+      optionValues,
+      and(
+        eq(optionValues.id, optionValueId),
+        exists(
+          this.db
+            .select({ productId: productOptions.productId })
+            .from(productOptions)
+            .where(
+              and(
+                eq(productOptions.productId, productId),
+                eq(productOptions.optionTypeId, optionValues.optionTypeId),
+              ),
+            ),
+        ),
+      ),
     );
+    if (!count) throw invalidField('optionValueId', "Choose one of the product's option values");
   }
 }

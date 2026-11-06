@@ -1,59 +1,57 @@
 import type { Product } from '@repo/shared';
-import type { Prisma } from '../../generated/prisma/client.js';
+import { asc, eq } from 'drizzle-orm';
+import { orNotFound, type Queryable } from '../../db/queries.js';
+import { productImages, productOptions, products, productVariants } from '../../db/schema/index.js';
 
-export const productSelect = {
-  id: true,
-  name: true,
-  slug: true,
-  description: true,
-  categoryId: true,
-  status: true,
-  price: true,
-  compareAtPrice: true,
-  options: {
-    select: {
-      optionTypeId: true,
-      position: true,
-      optionType: { select: { name: true, kind: true } },
-    },
-    orderBy: { position: 'asc' },
-  },
-  variants: {
-    select: {
+/** A product as the admin sees it, or a 404. */
+export async function findProduct(db: Queryable, id: string): Promise<Product> {
+  const row = await db.query.products.findFirst({
+    where: eq(products.id, id),
+    columns: {
       id: true,
-      sku: true,
+      name: true,
+      slug: true,
+      description: true,
+      categoryId: true,
+      status: true,
       price: true,
-      stock: true,
-      position: true,
-      optionValues: { select: { optionValueId: true } },
+      compareAtPrice: true,
     },
-    orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
-  },
-  images: {
-    select: { id: true, storageKey: true, alt: true, position: true, optionValueId: true },
-    orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
-  },
-} satisfies Prisma.ProductSelect;
+    with: {
+      options: {
+        columns: { optionTypeId: true, position: true },
+        with: { optionType: { columns: { name: true, kind: true } } },
+        orderBy: [asc(productOptions.position)],
+      },
+      variants: {
+        columns: { id: true, sku: true, price: true, stock: true, position: true },
+        with: { optionValues: { columns: { optionValueId: true } } },
+        orderBy: [asc(productVariants.position), asc(productVariants.createdAt)],
+      },
+      images: {
+        columns: { id: true, storageKey: true, alt: true, position: true, optionValueId: true },
+        orderBy: [asc(productImages.position), asc(productImages.createdAt)],
+      },
+    },
+  });
+  const product = orNotFound(row);
 
-type ProductRow = Prisma.ProductGetPayload<{ select: typeof productSelect }>;
-
-export function toProduct(row: ProductRow): Product {
   return {
-    id: row.id,
-    name: row.name,
-    slug: row.slug,
-    description: row.description,
-    categoryId: row.categoryId,
-    status: row.status,
-    price: row.price,
-    compareAtPrice: row.compareAtPrice,
-    options: row.options.map((option) => ({
+    id: product.id,
+    name: product.name,
+    slug: product.slug,
+    description: product.description,
+    categoryId: product.categoryId,
+    status: product.status,
+    price: product.price,
+    compareAtPrice: product.compareAtPrice,
+    options: product.options.map((option) => ({
       optionTypeId: option.optionTypeId,
       name: option.optionType.name,
       kind: option.optionType.kind,
       position: option.position,
     })),
-    variants: row.variants.map((variant) => ({
+    variants: product.variants.map((variant) => ({
       id: variant.id,
       sku: variant.sku,
       price: variant.price,
@@ -61,6 +59,6 @@ export function toProduct(row: ProductRow): Product {
       position: variant.position,
       optionValueIds: variant.optionValues.map((value) => value.optionValueId),
     })),
-    images: row.images.map(({ storageKey, ...image }) => ({ ...image, key: storageKey })),
+    images: product.images.map(({ storageKey, ...image }) => ({ ...image, key: storageKey })),
   };
 }
