@@ -1,46 +1,50 @@
 import { stockLevel, type CartLine } from '@repo/shared';
-import type { Prisma } from '../generated/prisma/client.js';
+import { asc, eq } from 'drizzle-orm';
+import type { Queryable } from '../db/queries.js';
+import { cartItems, productImages, productOptions } from '../db/schema/index.js';
 
-/** What's needed to show a cart line (and, at checkout, to turn it into an order line). */
-export const lineSelect = {
-  quantity: true,
-  variant: {
-    select: {
-      id: true,
-      sku: true,
-      price: true,
-      stock: true,
-      product: {
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          price: true,
-          status: true,
-          options: { select: { optionTypeId: true }, orderBy: { position: 'asc' } },
-          images: {
-            select: { storageKey: true, alt: true, optionValueId: true },
-            orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+/**
+ * A cart's lines, oldest first, with what's needed to show them (and, at checkout, to
+ * turn them into order lines).
+ */
+export function findCartLines(db: Queryable, cartId: string) {
+  return db.query.cartItems.findMany({
+    where: eq(cartItems.cartId, cartId),
+    columns: { quantity: true },
+    orderBy: [asc(cartItems.createdAt)],
+    with: {
+      variant: {
+        columns: { id: true, sku: true, price: true, stock: true },
+        with: {
+          product: {
+            columns: { id: true, name: true, slug: true, price: true, status: true },
+            with: {
+              options: {
+                columns: { optionTypeId: true },
+                orderBy: [asc(productOptions.position)],
+              },
+              images: {
+                columns: { storageKey: true, alt: true, optionValueId: true },
+                orderBy: [asc(productImages.position), asc(productImages.createdAt)],
+              },
+            },
           },
-        },
-      },
-      optionValues: {
-        select: {
-          optionValue: {
-            select: {
-              id: true,
-              label: true,
-              optionTypeId: true,
-              optionType: { select: { name: true } },
+          optionValues: {
+            columns: {},
+            with: {
+              optionValue: {
+                columns: { id: true, label: true, optionTypeId: true },
+                with: { optionType: { columns: { name: true } } },
+              },
             },
           },
         },
       },
     },
-  },
-} satisfies Prisma.CartItemSelect;
+  });
+}
 
-export type LineRow = Prisma.CartItemGetPayload<{ select: typeof lineSelect }>;
+export type LineRow = Awaited<ReturnType<typeof findCartLines>>[number];
 
 /** A cart line as shown to the shopper, with live price and availability. */
 export function toLine({ quantity, variant }: LineRow): CartLine {
