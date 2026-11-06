@@ -2,9 +2,11 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
 import { Mailer, type MailMessage } from '../src/mail/mailer.js';
-import { PrismaService } from '../src/prisma/prisma.service.js';
 import { cookiesFrom, createTestApp, WEB_ORIGIN } from './support/app.js';
 import { signUpAs } from './support/users.js';
+import { like } from 'drizzle-orm';
+import { users } from '../src/db/schema/index.js';
+import { testDatabase } from './support/database.js';
 
 describe('Password reset (e2e)', () => {
   let app: INestApplication<App>;
@@ -21,7 +23,7 @@ describe('Password reset (e2e)', () => {
 
   beforeAll(async () => {
     app = await createTestApp();
-    await app.get(PrismaService).user.deleteMany({ where: { email: { endsWith: '@reset.test' } } });
+    await testDatabase(app).delete(users).where(like(users.email, '%@reset.test'));
   });
 
   beforeEach(() => {

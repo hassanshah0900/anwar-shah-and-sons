@@ -10,7 +10,6 @@ build/
 next-env.d.ts
 
 # Generated code
-api/src/generated/
 
 # Turborepo
 .turbo/

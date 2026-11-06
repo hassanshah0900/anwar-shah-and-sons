@@ -63,7 +63,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      # Also builds @repo/shared and generates the Prisma client, which the tests import.
+      # Also builds @repo/shared, which the tests import.
       - run: npx turbo run build --filter=api
       - run: npm run test:e2e -w api
 

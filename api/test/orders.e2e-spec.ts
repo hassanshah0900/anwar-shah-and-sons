@@ -3,18 +3,24 @@ import { orderListSchema, orderSchema, type CheckoutInput, type Order } from '@r
 import request from 'supertest';
 import { App } from 'supertest/types.js';
 import { Mailer, type MailMessage } from '../src/mail/mailer.js';
-import { PrismaService } from '../src/prisma/prisma.service.js';
 import { createTestApp, WEB_ORIGIN } from './support/app.js';
 import { adminApi } from './support/catalog.js';
-import { resetCatalog } from './support/database.js';
 import { signUpAs } from './support/users.js';
+import type { Database } from '../src/db/connection.js';
+import { carts, orders, users } from '../src/db/schema/index.js';
+import {
+  resetCatalog,
+  stockOf as storedStock,
+  testDatabase,
+  variantOf,
+} from './support/database.js';
 
 // vitest.config.e2e.ts sets shipping to 250, free from 10,000 (PKR has no minor unit).
 const SHIPPING = 250;
 
 describe('Checkout and orders (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let db: Database;
   let admin: ReturnType<typeof adminApi>;
   let productId: string;
   /** small: 2,000 with 3 in stock; medium: 3,000 with 10 in stock. */
@@ -42,19 +48,18 @@ describe('Checkout and orders (e2e)', () => {
     };
   };
 
-  const stockOf = async (variantId: string) =>
-    (await prisma.productVariant.findUniqueOrThrow({ where: { id: variantId } })).stock;
+  const stockOf = (variantId: string) => storedStock(db, variantId);
   const setStock = (variantId: string, stock: number) =>
     admin.patch(`/products/${productId}/variants/${variantId}`, { stock }).expect(200);
   const placed = (body: unknown): Order => orderSchema.parse(body);
 
   beforeAll(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
-    await prisma.order.deleteMany();
-    await prisma.cart.deleteMany();
-    await resetCatalog(prisma);
-    await prisma.user.deleteMany();
+    db = testDatabase(app);
+    await db.delete(orders);
+    await db.delete(carts);
+    await resetCatalog(db);
+    await db.delete(users);
     admin = adminApi(app, await signUpAs(app, 'orders-admin@example.com', 'admin'));
 
     const categoryId = (await admin.post('/categories', { name: 'Shirts' }).expect(201)).body.id;
@@ -86,11 +91,7 @@ describe('Checkout and orders (e2e)', () => {
           optionValueIds: [valueId],
         })
         .expect(201);
-      variant[key] = (
-        await prisma.productVariant.findFirstOrThrow({
-          where: { productId, optionValues: { some: { optionValueId: valueId } } },
-        })
-      ).id;
+      variant[key] = (await variantOf(db, productId, valueId)).id;
     }
     await admin.patch(`/products/${productId}`, { status: 'active' }).expect(200);
   });

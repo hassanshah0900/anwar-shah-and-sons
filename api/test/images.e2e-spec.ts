@@ -4,11 +4,11 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
-import { PrismaService } from '../src/prisma/prisma.service.js';
 import { createTestApp, WEB_ORIGIN } from './support/app.js';
 import { adminApi } from './support/catalog.js';
-import { resetCatalog } from './support/database.js';
 import { signUpAs } from './support/users.js';
+import { users } from '../src/db/schema/index.js';
+import { resetCatalog, testDatabase } from './support/database.js';
 
 // A valid 1×1 PNG.
 const PNG = Buffer.from(
@@ -40,9 +40,9 @@ describe('Admin product images (e2e)', () => {
 
   beforeAll(async () => {
     app = await createTestApp();
-    const prisma = app.get(PrismaService);
-    await resetCatalog(prisma);
-    await prisma.user.deleteMany();
+    const db = testDatabase(app);
+    await resetCatalog(db);
+    await db.delete(users);
     admin = await signUpAs(app, 'images-admin@example.com', 'admin');
     api = adminApi(app, admin);
 

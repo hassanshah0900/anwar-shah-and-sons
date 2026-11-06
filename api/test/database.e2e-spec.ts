@@ -1,7 +1,9 @@
 import { INestApplication } from '@nestjs/common';
 import { App } from 'supertest/types.js';
-import { PrismaService } from '../src/prisma/prisma.service.js';
 import { createTestApp } from './support/app.js';
+import { eq, sql } from 'drizzle-orm';
+import { users } from '../src/db/schema/index.js';
+import { testDatabase } from './support/database.js';
 
 /** Guards against e2e suites writing to development data in the public schema. */
 describe('E2E database isolation', () => {
@@ -16,23 +18,25 @@ describe('E2E database isolation', () => {
   });
 
   it('runs every query against the e2e schema', async () => {
-    const prisma = app.get(PrismaService);
+    const db = testDatabase(app);
     const marker = `isolation-${Date.now()}@example.com`;
 
-    await prisma.user.create({ data: { id: marker, name: 'Isolation', email: marker } });
+    await db.insert(users).values({ id: marker, name: 'Isolation', email: marker });
 
     try {
-      const rows = await prisma.$queryRaw<{ count: bigint }[]>`
-        SELECT count(*) AS count FROM e2e.users WHERE email = ${marker}`;
-      expect(Number(rows[0]?.count)).toBe(1);
+      const { rows } = await db.execute<{ count: number }>(
+        sql`SELECT count(*)::int AS count FROM e2e.users WHERE email = ${marker}`,
+      );
+      expect(rows[0]?.count).toBe(1);
     } finally {
-      await prisma.user.delete({ where: { email: marker } });
+      await db.delete(users).where(eq(users.email, marker));
     }
   });
 
   it('runs raw SQL against the e2e schema too', async () => {
-    const rows = await app.get(PrismaService).$queryRaw<{ schema: string }[]>`
-      SELECT current_schema() AS schema`;
+    const { rows } = await testDatabase(app).execute<{ schema: string }>(
+      sql`SELECT current_schema() AS schema`,
+    );
     expect(rows[0]?.schema).toBe('e2e');
   });
 });
