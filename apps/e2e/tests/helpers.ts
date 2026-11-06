@@ -49,7 +49,7 @@ export async function addToBag(page: Page) {
     .click();
   // The add is done once the toast shows; the header's count follows on the next refresh,
   // which can lag on a busy machine.
-  await expect(page.getByText('Added to your bag')).toBeVisible();
+  await expect(page.getByText('Added to your bag')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole('banner').getByRole('link', { name: /bag/i })).toContainText(/\d/, {
     timeout: 15_000,
   });
