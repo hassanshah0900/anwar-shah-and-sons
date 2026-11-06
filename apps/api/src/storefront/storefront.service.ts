@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import {
+  ratingSummary,
   stockLevel,
   type Category,
   type Facet,
@@ -19,6 +20,8 @@ const cardSelect = {
   slug: true,
   price: true,
   compareAtPrice: true,
+  reviewCount: true,
+  ratingTotal: true,
   images: {
     select: { storageKey: true, alt: true },
     orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
@@ -122,6 +125,8 @@ export class StorefrontService {
         description: true,
         price: true,
         compareAtPrice: true,
+        reviewCount: true,
+        ratingTotal: true,
         categoryId: true,
         options: {
           orderBy: { position: 'asc' },
@@ -169,6 +174,7 @@ export class StorefrontService {
       description: product.description,
       price: product.price,
       compareAtPrice: product.compareAtPrice,
+      rating: ratingSummary(product.reviewCount, product.ratingTotal),
       breadcrumbs: await this.breadcrumbs(product.categoryId),
       options: product.options.map(({ optionType }) => ({
         name: optionType.name,
@@ -293,5 +299,6 @@ function toCard(row: CardRow): ProductCard {
       .sort((a, b) => a.position - b.position)
       .map(({ label, slug, colorHex }) => ({ label, slug, colorHex })),
     inStock: row.variants.some((variant) => variant.stock > 0),
+    rating: ratingSummary(row.reviewCount, row.ratingTotal),
   };
 }
