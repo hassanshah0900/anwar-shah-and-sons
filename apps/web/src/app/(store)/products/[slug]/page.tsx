@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Fragment, Suspense } from 'react';
+import { Suspense } from 'react';
+import { PageBreadcrumbs } from '@/components/layout/page-breadcrumbs';
 import { JsonLd } from '@/components/seo/json-ld';
 import { ProductView } from '@/components/shop/product-view';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -76,20 +76,7 @@ async function Product({ params, searchParams }: Props) {
         initialSelection={initialSelection(product, query)}
         header={
           <>
-            <nav aria-label="Breadcrumb">
-              <ol className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                {crumbs.map((crumb, index) => (
-                  <Fragment key={crumb.href}>
-                    {index > 0 && <li aria-hidden>/</li>}
-                    <li>
-                      <Link href={crumb.href} className="hover:text-foreground">
-                        {crumb.name}
-                      </Link>
-                    </li>
-                  </Fragment>
-                ))}
-              </ol>
-            </nav>
+            <PageBreadcrumbs crumbs={crumbs} />
             <h1 className="text-4xl sm:text-5xl">{product.name}</h1>
           </>
         }

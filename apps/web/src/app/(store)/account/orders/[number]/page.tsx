@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { CheckCircle2Icon } from 'lucide-react';
@@ -13,6 +12,7 @@ import { getStoreConfig } from '@/lib/api/store';
 import { requireUser } from '@/lib/auth/session';
 import { CancelOrder } from './cancel-order';
 import { PayNow } from './pay-now';
+import { PageBreadcrumbs } from '@/components/layout/page-breadcrumbs';
 
 type Props = PageProps<'/account/orders/[number]'>;
 
@@ -67,11 +67,7 @@ async function OrderView({ params, searchParams }: Props) {
         ))}
 
       <header className="flex flex-col gap-3">
-        <nav aria-label="Breadcrumb" className="text-xs text-muted-foreground">
-          <Link href="/account/orders" className="hover:text-foreground">
-            Your orders
-          </Link>
-        </nav>
+        <PageBreadcrumbs crumbs={[{ name: 'Your orders', href: '/account/orders' }]} />
         <div className="flex flex-wrap items-center gap-4">
           <h1 className="text-5xl">Order #{order.number}</h1>
           <OrderStatusBadge order={order} />

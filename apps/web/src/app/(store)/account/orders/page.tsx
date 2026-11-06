@@ -10,6 +10,7 @@ import { getMyOrders } from '@/lib/api/orders';
 import { getStoreConfig } from '@/lib/api/store';
 import { requireUser } from '@/lib/auth/session';
 import { formatPrice } from '@/lib/money';
+import { PageBreadcrumbs } from '@/components/layout/page-breadcrumbs';
 
 export const metadata: Metadata = {
   title: 'Your orders',
@@ -21,11 +22,7 @@ const PAGE_SIZE = 20;
 export default function OrdersPage({ searchParams }: PageProps<'/account/orders'>) {
   return (
     <main className="page-container py-16">
-      <nav aria-label="Breadcrumb" className="text-xs text-muted-foreground">
-        <Link href="/account" className="hover:text-foreground">
-          Your account
-        </Link>
-      </nav>
+      <PageBreadcrumbs crumbs={[{ name: 'Your account', href: '/account' }]} />
       <h1 className="mt-3 text-5xl">Your orders</h1>
       <Suspense fallback={<Skeleton className="mt-10 h-64 w-full" />}>
         <Orders searchParams={searchParams} />

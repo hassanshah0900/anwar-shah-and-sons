@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { Fragment } from 'react';
+import { PageBreadcrumbs, type Crumb } from '@/components/layout/page-breadcrumbs';
 
-export type Crumb = { name: string; href: string };
+export type { Crumb };
 
 /** Breadcrumbs, title and an optional row of links (sub-categories) above a listing. */
 export function ShopHeader({
@@ -20,25 +20,7 @@ export function ShopHeader({
 }) {
   return (
     <header className="flex flex-col gap-4 pb-10">
-      {breadcrumbs.length > 0 && (
-        <nav aria-label="Breadcrumb">
-          <ol className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            {breadcrumbs.map((crumb) => (
-              <Fragment key={crumb.href}>
-                <li>
-                  <Link href={crumb.href} className="hover:text-foreground">
-                    {crumb.name}
-                  </Link>
-                </li>
-                <li aria-hidden>/</li>
-              </Fragment>
-            ))}
-            <li aria-current="page" className="text-foreground">
-              {title}
-            </li>
-          </ol>
-        </nav>
-      )}
+      {breadcrumbs.length > 0 && <PageBreadcrumbs crumbs={breadcrumbs} current={title} />}
 
       <h1 className="text-4xl sm:text-5xl">{title}</h1>
       {description && <p className="max-w-2xl text-muted-foreground">{description}</p>}

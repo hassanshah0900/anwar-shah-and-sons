@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { Suspense } from 'react';
 import { MAX_ADDRESSES, type Address } from '@repo/shared';
 import { ConfirmDeleteDialog } from '@/components/admin/confirm-delete-dialog';
@@ -11,17 +10,14 @@ import { requireUser } from '@/lib/auth/session';
 import { makeDefaultAddress, removeAddress } from './actions';
 import { AddressDialog } from './address-dialog';
 import { MakeDefaultButton } from './make-default-button';
+import { PageBreadcrumbs } from '@/components/layout/page-breadcrumbs';
 
 export const metadata: Metadata = { title: 'Your addresses', robots: { index: false } };
 
 export default function AddressesPage() {
   return (
     <main className="page-container py-16">
-      <nav aria-label="Breadcrumb" className="text-xs text-muted-foreground">
-        <Link href="/account" className="hover:text-foreground">
-          Your account
-        </Link>
-      </nav>
+      <PageBreadcrumbs crumbs={[{ name: 'Your account', href: '/account' }]} />
       <h1 className="mt-3 text-5xl">Your addresses</h1>
       <p className="mt-3 text-muted-foreground">Your default address fills in checkout.</p>
       <Suspense fallback={<Skeleton className="mt-10 h-48 w-full" />}>
