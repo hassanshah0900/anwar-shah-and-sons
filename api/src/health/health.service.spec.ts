@@ -1,24 +1,24 @@
 import { Test } from '@nestjs/testing';
 import { healthResponseSchema } from '@repo/shared';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { DATABASE } from '../db/database.module.js';
 import { HealthService } from './health.service.js';
 
 describe('HealthService', () => {
-  const prisma = { $queryRaw: vi.fn() };
+  const db = { execute: vi.fn() };
   let service: HealthService;
 
   beforeEach(async () => {
-    prisma.$queryRaw.mockReset();
+    db.execute.mockReset();
 
     const moduleRef = await Test.createTestingModule({
-      providers: [HealthService, { provide: PrismaService, useValue: prisma }],
+      providers: [HealthService, { provide: DATABASE, useValue: db }],
     }).compile();
 
     service = moduleRef.get(HealthService);
   });
 
   it('reports ok when the database responds', async () => {
-    prisma.$queryRaw.mockResolvedValue([{ '?column?': 1 }]);
+    db.execute.mockResolvedValue({ rows: [{ '?column?': 1 }] });
 
     const result = await service.check();
 
@@ -28,7 +28,7 @@ describe('HealthService', () => {
   });
 
   it('reports error when the database is unreachable', async () => {
-    prisma.$queryRaw.mockRejectedValue(new Error('connect ECONNREFUSED'));
+    db.execute.mockRejectedValue(new Error('connect ECONNREFUSED'));
 
     const result = await service.check();
 
