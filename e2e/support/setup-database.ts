@@ -14,6 +14,6 @@ await client.end();
 const run = (command: string) =>
   execSync(command, { cwd: API_DIR, env: { ...process.env, ...apiEnv }, stdio: 'inherit' });
 
-run('npx prisma migrate deploy');
+run('npm run db:migrate');
 run('npm run db:seed');
 run('npm run db:seed:demo');

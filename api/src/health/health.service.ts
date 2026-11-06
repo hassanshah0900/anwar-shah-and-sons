@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { HealthResponse } from '@repo/shared';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { sql } from 'drizzle-orm';
+import type { Database } from '../db/connection.js';
+import { InjectDatabase } from '../db/database.module.js';
 
 type CheckStatus = HealthResponse['checks'][string]['status'];
 
@@ -8,7 +10,7 @@ type CheckStatus = HealthResponse['checks'][string]['status'];
 export class HealthService {
   private readonly logger = new Logger(HealthService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@InjectDatabase() private readonly db: Database) {}
 
   async check(): Promise<HealthResponse> {
     const database = await this.checkDatabase();
@@ -22,7 +24,7 @@ export class HealthService {
 
   private async checkDatabase(): Promise<CheckStatus> {
     try {
-      await this.prisma.$queryRaw`SELECT 1`;
+      await this.db.execute(sql`SELECT 1`);
       return 'up';
     } catch (error) {
       this.logger.warn(`Database health check failed: ${String(error)}`);

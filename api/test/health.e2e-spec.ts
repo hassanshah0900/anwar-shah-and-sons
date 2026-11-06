@@ -5,14 +5,18 @@ import request from 'supertest';
 import { App } from 'supertest/types.js';
 import { AppModule } from '../src/app.module.js';
 import { appOptions, configureApp } from '../src/app.setup.js';
+import { DATABASE } from '../src/db/database.module.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 
 describe('GET /api/health (e2e)', () => {
-  const prisma = { $queryRaw: vi.fn(), $disconnect: vi.fn() };
+  const db = { execute: vi.fn() };
+  const prisma = { $disconnect: vi.fn() };
   let app: INestApplication<App>;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(DATABASE)
+      .useValue(db)
       .overrideProvider(PrismaService)
       .useValue(prisma)
       .compile();
@@ -27,7 +31,7 @@ describe('GET /api/health (e2e)', () => {
   });
 
   it('returns 200 and the health contract when the database is up', async () => {
-    prisma.$queryRaw.mockResolvedValueOnce([]);
+    db.execute.mockResolvedValueOnce({ rows: [] });
 
     const response = await request(app.getHttpServer()).get('/api/health').expect(200);
 
@@ -35,7 +39,7 @@ describe('GET /api/health (e2e)', () => {
   });
 
   it('returns 503 when the database is down', async () => {
-    prisma.$queryRaw.mockRejectedValueOnce(new Error('connect ECONNREFUSED'));
+    db.execute.mockRejectedValueOnce(new Error('connect ECONNREFUSED'));
 
     const response = await request(app.getHttpServer()).get('/api/health').expect(503);
 
@@ -47,7 +51,7 @@ describe('GET /api/health (e2e)', () => {
   });
 
   it('sets security headers and allows the configured CORS origin', async () => {
-    prisma.$queryRaw.mockResolvedValueOnce([]);
+    db.execute.mockResolvedValueOnce({ rows: [] });
 
     const response = await request(app.getHttpServer())
       .get('/api/health')

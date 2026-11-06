@@ -147,17 +147,18 @@ is logged.
 
 ## Scripts
 
-| Command               | Description                                |
-| --------------------- | ------------------------------------------ |
-| `npm run dev`         | Start in watch mode                        |
-| `npm run build`       | Compile to `dist/`                         |
-| `npm start`           | Run the compiled app                       |
-| `npm test`            | Unit tests (`src/**/*.spec.ts`)            |
-| `npm run test:e2e`    | HTTP-level tests (`test/**/*.e2e-spec.ts`) |
-| `npm run db:generate` | Generate the Prisma client                 |
-| `npm run db:migrate`  | Create and apply a migration (development) |
-| `npm run db:deploy`   | Apply pending migrations (production)      |
-| `npm run db:studio`   | Open Prisma Studio                         |
+| Command                    | Description                                                     |
+| -------------------------- | --------------------------------------------------------------- |
+| `npm run dev`              | Start in watch mode                                             |
+| `npm run build`            | Compile to `dist/`                                              |
+| `npm start`                | Run the compiled app                                            |
+| `npm test`                 | Unit tests (`src/**/*.spec.ts`)                                 |
+| `npm run test:e2e`         | HTTP-level tests (`test/**/*.e2e-spec.ts`)                      |
+| `npm run db:new-migration` | Write a migration for your changes to `src/db/schema`           |
+| `npm run db:migrate`       | Apply pending migrations (development)                          |
+| `npm run db:deploy`        | Apply pending migrations from the build in `dist/` (production) |
+| `npm run db:studio`        | Browse the database in Drizzle Studio                           |
+| `npm run db:generate`      | Generate the Prisma client (until the move to Drizzle ends)     |
 
 Run them from this directory, or from the root with `npm run <script> -w api`.
 
@@ -169,7 +170,8 @@ src/
   catalog/      categories, product options, products and variants
   common/       validation pipe, error filter, origin guard
   config/       environment validation
-  prisma/       PrismaService (single client / connection pool)
+  db/           Drizzle schema, connection pool and migration runner
+  prisma/       PrismaService (being replaced by db/)
   health/       health check module
   store/        store settings endpoint
   storage/      media storage drivers (local, S3) and image type detection
@@ -178,7 +180,8 @@ src/
   users/        current user and admin user list
   generated/    Prisma client (generated, git-ignored)
   app.setup.ts  HTTP setup shared by main.ts and e2e tests
+drizzle/        migrations (SQL), written by `npm run db:new-migration`
 prisma/
-  schema.prisma
+  schema.prisma Prisma's copy of the schema (being replaced by src/db/schema)
 test/           e2e tests
 ```
