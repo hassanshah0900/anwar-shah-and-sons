@@ -14,7 +14,6 @@ import { HealthModule } from './health/health.module.js';
 import { MailModule } from './mail/mail.module.js';
 import { MediaModule } from './media/media.module.js';
 import { OrdersModule } from './orders/orders.module.js';
-import { PrismaModule } from './prisma/prisma.module.js';
 import { ReviewsModule } from './reviews/reviews.module.js';
 import { StorageModule } from './storage/storage.module.js';
 import { StoreModule } from './store/store.module.js';
@@ -26,7 +25,6 @@ import { UsersModule } from './users/users.module.js';
     ConfigModule.forRoot({ isGlobal: true, cache: true, validate: validateEnv }),
     ScheduleModule.forRoot(),
     DatabaseModule,
-    PrismaModule,
     StorageModule,
     MailModule,
     AuthModule,
