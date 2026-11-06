@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import type { CartLine, StoreConfig } from '@repo/shared';
 import { CartLineControls } from '@/components/cart/cart-line-controls';
+import { FreeDelivery } from '@/components/cart/free-delivery';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getCart } from '@/lib/api/cart';
@@ -61,6 +62,7 @@ async function CartContents() {
         <h2 id="summary-heading" className="font-sans text-base font-medium tracking-normal">
           Order summary
         </h2>
+        <FreeDelivery subtotal={cart.subtotal} store={store} />
         <dl className="flex flex-col gap-3 text-sm">
           <div className="flex justify-between gap-4">
             <dt className="text-muted-foreground">
