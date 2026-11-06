@@ -1,3 +1,5 @@
+import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
   PaginationContent,
   PaginationEllipsis,
@@ -9,7 +11,10 @@ import {
 } from '@/components/ui/pagination';
 import { pageWindow } from '@/lib/catalog/listing-params';
 
-/** Numbered page links; renders nothing when everything fits on one page. */
+/**
+ * Numbered page links with Previous and Next. Always shown, even for a single
+ * page, so lists keep the same layout; steps that go nowhere are disabled.
+ */
 export function Pagination({
   page,
   pages,
@@ -21,17 +26,22 @@ export function Pagination({
   href: (page: number) => string;
   className?: string;
 }) {
-  if (pages <= 1) return null;
+  const last = Math.max(1, pages);
 
   return (
     <PaginationRoot className={className}>
       <PaginationContent className="gap-1">
-        {page > 1 && (
-          <PaginationItem>
+        <PaginationItem>
+          {page > 1 ? (
             <PaginationPrevious href={href(page - 1)} rel="prev" />
-          </PaginationItem>
-        )}
-        {pageWindow(page, pages).map((item, index) => (
+          ) : (
+            <Button variant="ghost" disabled aria-label="Go to previous page" className="pl-1.5!">
+              <ChevronLeftIcon data-icon="inline-start" />
+              <span className="hidden sm:block">Previous</span>
+            </Button>
+          )}
+        </PaginationItem>
+        {pageWindow(page, last).map((item, index) => (
           <PaginationItem key={item ?? `gap-${index}`}>
             {item === null ? (
               <PaginationEllipsis />
@@ -46,11 +56,16 @@ export function Pagination({
             )}
           </PaginationItem>
         ))}
-        {page < pages && (
-          <PaginationItem>
+        <PaginationItem>
+          {page < last ? (
             <PaginationNext href={href(page + 1)} rel="next" />
-          </PaginationItem>
-        )}
+          ) : (
+            <Button variant="ghost" disabled aria-label="Go to next page" className="pr-1.5!">
+              <span className="hidden sm:block">Next</span>
+              <ChevronRightIcon data-icon="inline-end" />
+            </Button>
+          )}
+        </PaginationItem>
       </PaginationContent>
     </PaginationRoot>
   );

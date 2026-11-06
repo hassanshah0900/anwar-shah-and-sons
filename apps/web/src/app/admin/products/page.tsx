@@ -168,15 +168,13 @@ async function Products({ searchParams }: { searchParams: SearchParams }) {
         </div>
       )}
 
-      {total > 0 && (
-        <ListFooter
-          summary={`${total} ${total === 1 ? 'product' : 'products'}`}
-          total={total}
-          page={query.page}
-          pageSize={query.pageSize}
-          href={(page) => href({ page })}
-        />
-      )}
+      <ListFooter
+        summary={`${total} ${total === 1 ? 'product' : 'products'}`}
+        total={total}
+        page={query.page}
+        pageSize={query.pageSize}
+        href={(page) => href({ page })}
+      />
     </>
   );
 }
