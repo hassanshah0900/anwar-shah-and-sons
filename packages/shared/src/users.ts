@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { paginationQuerySchema } from './pagination.js';
 import { sessionUserSchema } from './auth.js';
 
 /** A user as listed in the admin area. */
@@ -12,3 +13,6 @@ export const userListSchema = z.object({
   total: z.number().int().nonnegative(),
 });
 export type UserList = z.infer<typeof userListSchema>;
+
+export const userListQuerySchema = paginationQuerySchema;
+export type UserListQuery = z.infer<typeof userListQuerySchema>;

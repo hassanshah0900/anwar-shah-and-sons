@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { paginationQuerySchema } from './pagination.js';
 import { optionKindSchema } from './catalog.js';
 import { slugSchema } from './slug.js';
 
@@ -105,8 +106,7 @@ export const productListQuerySchema = z.object({
   status: productStatusSchema.optional(),
   categoryId: idSchema.optional(),
   q: z.string().trim().max(100).optional(),
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  ...paginationQuerySchema.shape,
 });
 export type ProductListQuery = z.infer<typeof productListQuerySchema>;
 

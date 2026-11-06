@@ -6,6 +6,7 @@ export * from './dashboard.js';
 export * from './health.js';
 export * from './money.js';
 export * from './orders.js';
+export * from './pagination.js';
 export * from './products.js';
 export * from './slug.js';
 export * from './store.js';
