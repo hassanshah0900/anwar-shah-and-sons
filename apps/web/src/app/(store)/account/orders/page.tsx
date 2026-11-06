@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
+import { DEFAULT_PAGE_SIZE, paginationQuerySchema, type PaginationQuery } from '@repo/shared';
+import { ListFooter } from '@/components/lists/list-footer';
 import { formatOrderDate } from '@/components/orders/order-details';
 import { OrderStatusBadge } from '@/components/orders/order-status-badge';
-import { Pagination } from '@/components/shop/pagination';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -25,8 +26,6 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
-const PAGE_SIZE = 20;
-
 export default function OrdersPage({ searchParams }: PageProps<'/account/orders'>) {
   return (
     <main className="page-container py-16">
@@ -41,12 +40,18 @@ export default function OrdersPage({ searchParams }: PageProps<'/account/orders'
 
 async function Orders({ searchParams }: Pick<PageProps<'/account/orders'>, 'searchParams'>) {
   await requireUser('/account/orders');
-  const raw = Number((await searchParams).page);
-  const page = Number.isInteger(raw) && raw > 1 ? raw : 1;
-  const [{ orders, total }, store] = await Promise.all([
-    getMyOrders({ page, pageSize: PAGE_SIZE }),
-    getStoreConfig(),
-  ]);
+  const raw = await searchParams;
+  const parsed = paginationQuerySchema.safeParse({ page: raw.page, pageSize: raw.pageSize });
+  const query: PaginationQuery = parsed.success
+    ? parsed.data
+    : { page: 1, pageSize: DEFAULT_PAGE_SIZE };
+  const href = (page: number) => {
+    const params = new URLSearchParams();
+    if (page > 1) params.set('page', String(page));
+    if (query.pageSize !== DEFAULT_PAGE_SIZE) params.set('pageSize', String(query.pageSize));
+    return `/account/orders${params.size ? `?${params}` : ''}`;
+  };
+  const [{ orders, total }, store] = await Promise.all([getMyOrders(query), getStoreConfig()]);
 
   if (total === 0) {
     return (
@@ -96,10 +101,12 @@ async function Orders({ searchParams }: Pick<PageProps<'/account/orders'>, 'sear
           ))}
         </TableBody>
       </Table>
-      <Pagination
-        page={page}
-        pages={Math.ceil(total / PAGE_SIZE)}
-        href={(target) => (target > 1 ? `/account/orders?page=${target}` : '/account/orders')}
+      <ListFooter
+        summary={`${total} ${total === 1 ? 'order' : 'orders'}`}
+        total={total}
+        page={query.page}
+        pageSize={query.pageSize}
+        href={href}
       />
     </div>
   );

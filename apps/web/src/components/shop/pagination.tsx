@@ -14,15 +14,17 @@ export function Pagination({
   page,
   pages,
   href,
+  className,
 }: {
   page: number;
   pages: number;
   href: (page: number) => string;
+  className?: string;
 }) {
   if (pages <= 1) return null;
 
   return (
-    <PaginationRoot>
+    <PaginationRoot className={className}>
       <PaginationContent className="gap-1">
         {page > 1 && (
           <PaginationItem>
