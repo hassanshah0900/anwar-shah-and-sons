@@ -1,71 +1,91 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { slugify, type Category, type CategoryInput } from '@repo/shared';
-import { PrismaService } from '../../prisma/prisma.service.js';
+import { asc, eq, isNull } from 'drizzle-orm';
+import type { Database } from '../../db/connection.js';
+import { InjectDatabase } from '../../db/database.module.js';
+import { found, nextPosition, touch } from '../../db/queries.js';
+import { categories } from '../../db/schema/index.js';
 
-const categorySelect = {
-  id: true,
-  name: true,
-  slug: true,
-  description: true,
-  parentId: true,
-  position: true,
-} as const;
+const categoryColumns = {
+  id: categories.id,
+  name: categories.name,
+  slug: categories.slug,
+  description: categories.description,
+  parentId: categories.parentId,
+  position: categories.position,
+};
 
 @Injectable()
 export class CategoriesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@InjectDatabase() private readonly db: Database) {}
 
   list(): Promise<Category[]> {
-    return this.prisma.category.findMany({
-      select: categorySelect,
-      orderBy: [{ position: 'asc' }, { name: 'asc' }],
-    });
+    return this.db
+      .select(categoryColumns)
+      .from(categories)
+      .orderBy(asc(categories.position), asc(categories.name));
   }
 
   async create(input: CategoryInput): Promise<Category> {
-    if (input.parentId) await this.assertExists(input.parentId);
-    const last = await this.prisma.category.aggregate({
-      where: { parentId: input.parentId ?? null },
-      _max: { position: true },
-    });
+    const parentId = input.parentId ?? null;
+    if (parentId) await this.assertExists(parentId);
+    // Without an explicit position, new categories go after their siblings.
+    const position =
+      input.position ??
+      (await nextPosition(
+        this.db,
+        categories,
+        parentId ? eq(categories.parentId, parentId) : isNull(categories.parentId),
+      ));
 
-    return this.prisma.category.create({
-      select: categorySelect,
-      data: {
+    const rows = await this.db
+      .insert(categories)
+      .values({
         name: input.name,
         slug: input.slug ?? slugify(input.name),
         description: input.description ?? null,
-        parentId: input.parentId ?? null,
-        // Without an explicit position, new categories go after their siblings.
-        position: input.position ?? (last._max.position ?? -1) + 1,
-      },
-    });
+        parentId,
+        position,
+      })
+      .returning(categoryColumns);
+    return found(rows);
   }
 
   async update(id: string, input: Partial<CategoryInput>): Promise<Category> {
     if (input.parentId) await this.assertValidParent(id, input.parentId);
 
-    return this.prisma.category.update({
-      where: { id },
-      select: categorySelect,
-      data: {
-        name: input.name,
-        slug: input.slug,
-        description: input.description,
-        parentId: input.parentId,
-        position: input.position,
-      },
-    });
+    const rows = await this.db
+      .update(categories)
+      .set(
+        touch({
+          name: input.name,
+          slug: input.slug,
+          description: input.description,
+          parentId: input.parentId,
+          position: input.position,
+        }),
+      )
+      .where(eq(categories.id, id))
+      .returning(categoryColumns);
+    return found(rows);
   }
 
-  /** Fails with 409 while the category still has sub-categories. */
+  /** Fails with 409 while the category still has sub-categories or products. */
   async remove(id: string): Promise<void> {
-    await this.prisma.category.delete({ where: { id } });
+    found(
+      await this.db
+        .delete(categories)
+        .where(eq(categories.id, id))
+        .returning({ id: categories.id }),
+    );
   }
 
   private async assertExists(id: string): Promise<void> {
-    const found = await this.prisma.category.findUnique({ where: { id }, select: { id: true } });
-    if (!found) throw new BadRequestException('Parent category does not exist');
+    const node = await this.db.query.categories.findFirst({
+      where: eq(categories.id, id),
+      columns: { id: true },
+    });
+    if (!node) throw new BadRequestException('Parent category does not exist');
   }
 
   /** A category can't be its own parent or move under one of its descendants. */
@@ -74,10 +94,11 @@ export class CategoriesService {
 
     let current: string | null = parentId;
     while (current) {
-      const node: { parentId: string | null } | null = await this.prisma.category.findUnique({
-        where: { id: current },
-        select: { parentId: true },
-      });
+      const node: { parentId: string | null } | undefined =
+        await this.db.query.categories.findFirst({
+          where: eq(categories.id, current),
+          columns: { parentId: true },
+        });
       if (!node) throw new BadRequestException('Parent category does not exist');
       if (node.parentId === id) {
         throw new BadRequestException('A category cannot move under its own sub-category');
