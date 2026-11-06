@@ -6,18 +6,20 @@ import { getShopNav, shopAllLink, type NavLink } from '@/lib/catalog/nav';
 export function SiteFooter() {
   return (
     <footer className="mt-auto border-t">
-      <div className="page-container grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="page-container grid gap-10 py-12 lg:grid-cols-[2fr_3fr] lg:gap-16">
         <div>
           <p className="font-heading text-2xl leading-none">{siteConfig.name}</p>
-          <p className="mt-3 max-w-xs text-sm text-muted-foreground">{siteConfig.description}</p>
+          <p className="mt-3 max-w-xs text-sm text-muted-foreground">{siteConfig.home.intro}</p>
         </div>
 
-        <Suspense fallback={<FooterSection title="Shop" links={[shopAllLink]} />}>
-          <ShopSection />
-        </Suspense>
-        {siteConfig.footerNav.map((section) => (
-          <FooterSection key={section.title} title={section.title} links={section.links} />
-        ))}
+        <nav aria-label="Footer" className="grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-3">
+          <Suspense fallback={<FooterSection title="Shop" links={[shopAllLink]} />}>
+            <ShopSection />
+          </Suspense>
+          {siteConfig.footerNav.map((section) => (
+            <FooterSection key={section.title} title={section.title} links={section.links} />
+          ))}
+        </nav>
       </div>
 
       <div className="border-t">
@@ -36,9 +38,9 @@ async function ShopSection() {
 function FooterSection({ title, links }: { title: string; links: readonly NavLink[] }) {
   return (
     <div>
-      <h3 className="text-xs font-medium tracking-widest text-muted-foreground uppercase">
+      <h2 className="font-sans text-xs font-medium tracking-widest text-muted-foreground uppercase">
         {title}
-      </h3>
+      </h2>
       <ul className="mt-4 space-y-3">
         {links.map((link) => (
           <li key={link.href}>
