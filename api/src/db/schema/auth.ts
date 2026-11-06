@@ -22,6 +22,7 @@ export const users = pgTable(
     updatedAt: timestamp3('updated_at')
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`)
+      .$defaultFn(() => new Date())
       .$onUpdate(() => new Date()),
   },
   (t) => [uniqueIndex('users_email_key').on(t.email)],
@@ -83,6 +84,7 @@ export const verifications = pgTable(
     updatedAt: timestamp3('updated_at')
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`)
+      .$defaultFn(() => new Date())
       .$onUpdate(() => new Date()),
   },
   (t) => [index('verifications_identifier_idx').on(t.identifier)],

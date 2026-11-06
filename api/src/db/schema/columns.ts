@@ -11,10 +11,15 @@ export const id = () =>
 /** Timestamps are stored with millisecond precision and no time zone (always UTC). */
 export const timestamp3 = (name: string) => timestamp(name, { precision: 3, mode: 'date' });
 
+/**
+ * The database fills it for rows inserted by hand; the app always sends its own (UTC) time,
+ * since CURRENT_TIMESTAMP in a column without a time zone follows the server's setting.
+ */
 export const createdAt = () =>
   timestamp3('created_at')
     .notNull()
-    .default(sql`CURRENT_TIMESTAMP`);
+    .default(sql`CURRENT_TIMESTAMP`)
+    .$defaultFn(() => new Date());
 
 /** Set by the application on every insert and update. */
 export const updatedAt = () =>
