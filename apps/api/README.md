@@ -42,7 +42,7 @@ role). See [ADR 0007](../../docs/adr/0007-media-storage.md).
 | `GET /api/health`                             | Health check: `200` when all dependencies are up, else `503` (public)                                                    |
 | `/api/auth/*`                                 | Better Auth: sign-up, sign-in, sign-out, session (public)                                                                |
 | `GET /api/v1/users/me`                        | The signed-in user                                                                                                       |
-| `GET /api/v1/users`                           | All users (admin only)                                                                                                   |
+| `GET /api/v1/users`                           | Users, newest first, by `page` and `pageSize` (default 25, at most 100; admin only)                                      |
 | `GET /api/v1/store`                           | Store currency and locale (public)                                                                                       |
 | `GET /api/v1/categories`                      | Category tree (public)                                                                                                   |
 | `GET /api/v1/products`                        | Active products: `category`, `q`, repeated `option=<option>:<value>`, `minPrice`, `maxPrice`, `sort`, `page` (public)    |
