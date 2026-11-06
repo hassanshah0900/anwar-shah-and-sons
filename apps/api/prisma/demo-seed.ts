@@ -10,7 +10,8 @@
  * NODE_ENV=production unless --force is passed.
  */
 import 'dotenv/config';
-import { randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { shippingFor, toMinorUnits } from '@repo/shared';
 import { createAuth } from '../src/auth/auth.js';
 import { validateEnv, type Env } from '../src/config/env.js';
@@ -29,7 +30,6 @@ import {
   kidsSizes,
   products,
 } from './demo/catalog.js';
-import { garmentImage } from './demo/images.js';
 
 const DAY = 86_400_000;
 const ORDER_COUNT = 60;
@@ -138,9 +138,45 @@ async function main() {
     }
 
     // ─── Products ──────────────────────────────────────────────────────────
+    /**
+     * Gives a product its photo (demo/photos/<slug>.webp), replacing older demo
+     * images, so re-running the seed upgrades a catalog made by an earlier version.
+     */
+    const usePhoto = async (productId: string, slug: string, name: string): Promise<boolean> => {
+      // Media URLs must be UUID file names; deriving it from the slug lets a re-run find it.
+      const hex = createHash('sha256').update(`demo-photo:${slug}`).digest('hex');
+      const uuid = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+      const key = `products/${productId}/${uuid}.webp`;
+      if (await prisma.productImage.findFirst({ where: { productId, storageKey: key } })) {
+        return false;
+      }
+      const old = await prisma.productImage.findMany({ where: { productId } });
+      await prisma.productImage.deleteMany({ where: { productId } });
+      await Promise.all(old.map((image) => storage.delete(image.storageKey)));
+
+      const body = await readFile(new URL(`./demo/photos/${slug}.webp`, import.meta.url));
+      await storage.put(key, body, 'image/webp');
+      await prisma.productImage.create({
+        data: {
+          productId,
+          storageKey: key,
+          contentType: 'image/webp',
+          size: body.length,
+          alt: name,
+          position: 0,
+        },
+      });
+      return true;
+    };
+
     let created = 0;
+    let photographed = 0;
     for (const [index, spec] of products.entries()) {
-      if (await prisma.product.findUnique({ where: { slug: spec.slug } })) continue;
+      const existing = await prisma.product.findUnique({ where: { slug: spec.slug } });
+      if (existing) {
+        if (await usePhoto(existing.id, spec.slug, spec.name)) photographed++;
+        continue;
+      }
 
       // Spread over the last six weeks, so "Newest" has an order to it.
       const createdAt = new Date(Date.now() - (products.length - index) * 2.3 * DAY);
@@ -185,26 +221,13 @@ async function main() {
         }
       }
 
-      for (const [imagePosition, colour] of spec.colours.entries()) {
-        const hex = colours.find((candidate) => candidate.slug === colour)!.hex;
-        const body = await garmentImage(spec.garment, hex, spec.pattern);
-        const key = `products/${product.id}/${randomUUID()}.webp`;
-        await storage.put(key, body, 'image/webp');
-        await prisma.productImage.create({
-          data: {
-            productId: product.id,
-            storageKey: key,
-            contentType: 'image/webp',
-            size: body.length,
-            alt: `${spec.name} in ${colours.find((candidate) => candidate.slug === colour)!.label.toLowerCase()}`,
-            position: imagePosition,
-            optionValueId: colourIds.get(colour)!,
-          },
-        });
-      }
+      await usePhoto(product.id, spec.slug, spec.name);
       created++;
     }
-    console.log(`Products: ${created} added, ${products.length - created} already there`);
+    console.log(
+      `Products: ${created} added, ${products.length - created} already there` +
+        (photographed ? `, ${photographed} given photos` : ''),
+    );
 
     // ─── Customers ─────────────────────────────────────────────────────────
     const auth = createAuth(prisma, env);

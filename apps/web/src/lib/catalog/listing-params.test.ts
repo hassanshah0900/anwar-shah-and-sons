@@ -9,7 +9,7 @@ import {
   type ListingState,
 } from './listing-params';
 
-const empty: ListingState = { options: [], sort: 'newest', page: 1 };
+const empty: ListingState = { options: [], sale: false, sort: 'newest', page: 1 };
 
 describe('readListingState', () => {
   it('defaults when the URL has no params', () => {
@@ -21,6 +21,7 @@ describe('readListingState', () => {
       readListingState({
         q: ' kurta ',
         option: ['size:m', 'colour:black'],
+        sale: '1',
         min: '1,000',
         max: '5000',
         sort: 'price-asc',
@@ -29,6 +30,7 @@ describe('readListingState', () => {
     ).toEqual({
       q: 'kurta',
       options: ['colour:black', 'size:m'],
+      sale: true,
       min: 1000,
       max: 5000,
       sort: 'price-asc',
@@ -51,6 +53,11 @@ describe('readListingState', () => {
 });
 
 describe('toListingQuery', () => {
+  it('asks for sale items only when the filter is on', () => {
+    expect(toListingQuery({ ...empty, sale: true }, 'PKR').onSale).toBe(true);
+    expect(toListingQuery(empty, 'PKR').onSale).toBeUndefined();
+  });
+
   it('converts prices to minor units', () => {
     const query = toListingQuery({ ...empty, min: 49.9, max: 100 }, 'USD', 'women');
     expect(query).toMatchObject({ category: 'women', minPrice: 4990, maxPrice: 10000 });
@@ -68,6 +75,10 @@ describe('listingHref', () => {
     expect(listingHref('/shop', state, { page: 5 })).toBe(
       '/shop?option=size%3Am&sort=price-desc&page=5',
     );
+  });
+
+  it('keeps the sale filter', () => {
+    expect(listingHref('/shop', { ...empty, sale: true })).toBe('/shop?sale=1');
   });
 
   it('gives a bare path for the default state', () => {

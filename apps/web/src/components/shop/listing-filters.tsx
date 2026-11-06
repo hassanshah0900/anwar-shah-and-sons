@@ -28,7 +28,12 @@ type FiltersProps = {
  * every filtered view has its own shareable URL.
  */
 export function ListingFilters({ pathname, state, facets, price, store, idPrefix }: FiltersProps) {
-  const cleared = listingHref(pathname, state, { options: [], min: undefined, max: undefined });
+  const cleared = listingHref(pathname, state, {
+    options: [],
+    sale: false,
+    min: undefined,
+    max: undefined,
+  });
 
   return (
     <div className="flex flex-col gap-8">
@@ -37,6 +42,19 @@ export function ListingFilters({ pathname, state, facets, price, store, idPrefix
           Clear all filters
         </Link>
       )}
+
+      <section className="flex flex-col gap-3">
+        <GroupHeading>Offers</GroupHeading>
+        <Link
+          href={listingHref(pathname, state, { sale: !state.sale })}
+          scroll={false}
+          className="flex items-center gap-3 py-1 text-sm hover:text-muted-foreground"
+        >
+          <CheckMark selected={state.sale} />
+          On sale
+          {state.sale && <span className="sr-only">(selected)</span>}
+        </Link>
+      </section>
 
       {facets.map((facet) => (
         <FacetGroup key={facet.slug} facet={facet} pathname={pathname} state={state} />
@@ -52,6 +70,21 @@ export function ListingFilters({ pathname, state, facets, price, store, idPrefix
         />
       )}
     </div>
+  );
+}
+
+/** A checkbox look for filter links. */
+function CheckMark({ selected }: { selected: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        'grid size-4 place-items-center rounded-xs border border-input',
+        selected && 'border-primary bg-primary text-primary-foreground',
+      )}
+    >
+      {selected && <CheckIcon className="size-3" />}
+    </span>
   );
 }
 
@@ -94,15 +127,7 @@ function FacetGroup({
                   scroll={false}
                   className="flex items-center gap-3 py-1 text-sm hover:text-muted-foreground"
                 >
-                  <span
-                    aria-hidden
-                    className={cn(
-                      'grid size-4 place-items-center rounded-xs border border-input',
-                      selected && 'border-primary bg-primary text-primary-foreground',
-                    )}
-                  >
-                    {selected && <CheckIcon className="size-3" />}
-                  </span>
+                  <CheckMark selected={selected} />
                   {value.colorHex && (
                     <Swatch color={value.colorHex} label={value.label} className="size-4" />
                   )}
@@ -166,6 +191,7 @@ function PriceFilter({
         {state.options.map((option) => (
           <input key={option} type="hidden" name="option" value={option} />
         ))}
+        {state.sale && <input type="hidden" name="sale" value="1" />}
         {state.sort !== 'newest' && <input type="hidden" name="sort" value={state.sort} />}
         <div className="grid grid-cols-2 gap-2">
           <div className="grid gap-1.5">
