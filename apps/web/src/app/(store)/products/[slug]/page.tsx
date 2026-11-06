@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { PageBreadcrumbs } from '@/components/layout/page-breadcrumbs';
 import { JsonLd } from '@/components/seo/json-ld';
+import { ProductReviews } from '@/components/reviews/product-reviews';
+import { RatingSummary } from '@/components/reviews/stars';
 import { ProductInfo } from '@/components/shop/product-info';
 import { ProductView } from '@/components/shop/product-view';
 import { RelatedProducts } from '@/components/shop/related-products';
@@ -80,18 +82,32 @@ async function Product({ params, searchParams }: Props) {
           <>
             <PageBreadcrumbs crumbs={crumbs} />
             <h1 className="text-4xl sm:text-5xl">{product.name}</h1>
+            {product.rating.average !== null && (
+              <a href="#reviews" className="w-fit text-sm hover:underline">
+                <RatingSummary rating={product.rating} />
+              </a>
+            )}
           </>
         }
       >
         <ProductInfo product={product} store={store} />
       </ProductView>
-      <div className="mt-16">
+      <div className="mt-16 flex flex-col gap-16">
+        <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+          <ProductReviews product={product} page={reviewsPage(query.reviews)} />
+        </Suspense>
         <Suspense fallback={null}>
           <RelatedProducts product={product} />
         </Suspense>
       </div>
     </>
   );
+}
+
+/** The `reviews` page number from the URL, 1 when missing or invalid. */
+function reviewsPage(value: string | string[] | undefined): number {
+  const page = Number(Array.isArray(value) ? value[0] : value);
+  return Number.isInteger(page) && page > 1 ? page : 1;
 }
 
 function ProductSkeleton() {

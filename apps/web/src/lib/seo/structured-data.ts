@@ -35,6 +35,13 @@ export function productJsonLd(product: ProductDetail, store: StoreConfig) {
     ...(product.description && { description: product.description }),
     image: product.images.map((image) => absoluteUrl(`/media/${image.key}`)),
     brand: { '@type': 'Brand', name: siteConfig.name },
+    ...(product.rating.average !== null && {
+      aggregateRating: {
+        '@type': 'AggregateRating',
+        ratingValue: product.rating.average,
+        reviewCount: product.rating.count,
+      },
+    }),
     offers:
       low === high
         ? {

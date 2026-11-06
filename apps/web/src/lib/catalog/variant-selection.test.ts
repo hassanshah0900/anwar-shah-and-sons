@@ -18,6 +18,7 @@ const product: ProductDetail = {
   description: null,
   price: 1000,
   compareAtPrice: null,
+  rating: { average: null, count: 0 },
   breadcrumbs: [],
   options: [
     {
