@@ -2,9 +2,11 @@ import { INestApplication } from '@nestjs/common';
 import { addressListSchema, addressSchema, MAX_ADDRESSES, type Address } from '@repo/shared';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
-import { PrismaService } from '../src/prisma/prisma.service.js';
 import { createTestApp, WEB_ORIGIN } from './support/app.js';
 import { signUpAs } from './support/users.js';
+import { like } from 'drizzle-orm';
+import { users } from '../src/db/schema/index.js';
+import { testDatabase } from './support/database.js';
 
 const home = {
   fullName: 'Ayesha Khan',
@@ -34,7 +36,7 @@ describe('Address book (e2e)', () => {
 
   beforeAll(async () => {
     app = await createTestApp();
-    await app.get(PrismaService).user.deleteMany({ where: { email: { endsWith: '@book.test' } } });
+    await testDatabase(app).delete(users).where(like(users.email, '%@book.test'));
   });
 
   afterAll(async () => {

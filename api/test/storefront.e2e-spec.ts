@@ -2,11 +2,12 @@ import { INestApplication } from '@nestjs/common';
 import { productDetailSchema, productListingSchema, type ProductListing } from '@repo/shared';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
-import { PrismaService } from '../src/prisma/prisma.service.js';
 import { createTestApp } from './support/app.js';
 import { adminApi } from './support/catalog.js';
-import { resetCatalog } from './support/database.js';
 import { signUpAs } from './support/users.js';
+import { eq } from 'drizzle-orm';
+import { products, users } from '../src/db/schema/index.js';
+import { resetCatalog, testDatabase } from './support/database.js';
 
 describe('Public catalog (e2e)', () => {
   let app: INestApplication<App>;
@@ -20,9 +21,9 @@ describe('Public catalog (e2e)', () => {
 
   beforeAll(async () => {
     app = await createTestApp();
-    const prisma = app.get(PrismaService);
-    await resetCatalog(prisma);
-    await prisma.user.deleteMany();
+    const db = testDatabase(app);
+    await resetCatalog(db);
+    await db.delete(users);
     const api = adminApi(app, await signUpAs(app, 'storefront-admin@example.com', 'admin'));
 
     const women = (await api.post('/categories', { name: 'Women' }).expect(201)).body.id;
@@ -126,16 +127,13 @@ describe('Public catalog (e2e)', () => {
   });
 
   it('filters to products on sale', async () => {
-    const prisma = app.get(PrismaService);
-    await prisma.product.updateMany({
-      where: { name: 'Lawn Kurta' },
-      data: { compareAtPrice: 6490 },
-    });
+    const db = testDatabase(app);
+    await db.update(products).set({ compareAtPrice: 6490 }).where(eq(products.name, 'Lawn Kurta'));
     try {
       expect(names(await listing('?onSale=true'))).toEqual(['Lawn Kurta']);
       expect(names(await listing('?onSale=false'))).toHaveLength(2);
     } finally {
-      await prisma.product.updateMany({ data: { compareAtPrice: null } });
+      await db.update(products).set({ compareAtPrice: null });
     }
   });
 

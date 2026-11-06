@@ -2,10 +2,10 @@ import { INestApplication } from '@nestjs/common';
 import { categoryListSchema, categorySchema } from '@repo/shared';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
-import { PrismaService } from '../src/prisma/prisma.service.js';
 import { createTestApp, WEB_ORIGIN } from './support/app.js';
-import { resetCatalog } from './support/database.js';
 import { signUpAs } from './support/users.js';
+import { users } from '../src/db/schema/index.js';
+import { resetCatalog, testDatabase } from './support/database.js';
 
 describe('Admin categories (e2e)', () => {
   let app: INestApplication<App>;
@@ -21,9 +21,9 @@ describe('Admin categories (e2e)', () => {
 
   beforeAll(async () => {
     app = await createTestApp();
-    const prisma = app.get(PrismaService);
-    await resetCatalog(prisma);
-    await prisma.user.deleteMany();
+    const db = testDatabase(app);
+    await resetCatalog(db);
+    await db.delete(users);
     admin = await signUpAs(app, 'catalog-admin@example.com', 'admin');
   });
 

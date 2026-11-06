@@ -2,12 +2,14 @@ import { INestApplication } from '@nestjs/common';
 import { userListSchema } from '@repo/shared';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
-import { PrismaService } from '../src/prisma/prisma.service.js';
 import { cookiesFrom, createTestApp, WEB_ORIGIN } from './support/app.js';
+import type { Database } from '../src/db/connection.js';
+import { users } from '../src/db/schema/index.js';
+import { makeAdmin, testDatabase } from './support/database.js';
 
 describe('Users (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let db: Database;
 
   const signUp = async (email: string) => {
     const response = await request(app.getHttpServer())
@@ -20,8 +22,8 @@ describe('Users (e2e)', () => {
 
   beforeAll(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
-    await prisma.user.deleteMany();
+    db = testDatabase(app);
+    await db.delete(users);
   });
 
   afterAll(async () => {
@@ -61,7 +63,7 @@ describe('Users (e2e)', () => {
 
     it('lists users for admins', async () => {
       const cookies = await signUp('admin@example.com');
-      await prisma.user.update({ where: { email: 'admin@example.com' }, data: { role: 'admin' } });
+      await makeAdmin(db, 'admin@example.com');
 
       const response = await request(app.getHttpServer())
         .get('/api/v1/users')
@@ -77,7 +79,7 @@ describe('Users (e2e)', () => {
       await signUp('first@example.com');
       await signUp('second@example.com');
       const cookies = await signUp('pager@example.com');
-      await prisma.user.update({ where: { email: 'pager@example.com' }, data: { role: 'admin' } });
+      await makeAdmin(db, 'pager@example.com');
       const page = (query: string) =>
         request(app.getHttpServer()).get(`/api/v1/users?${query}`).set('Cookie', cookies);
 
@@ -91,7 +93,7 @@ describe('Users (e2e)', () => {
 
     it('refuses a page size above the limit', async () => {
       const cookies = await signUp('limit@example.com');
-      await prisma.user.update({ where: { email: 'limit@example.com' }, data: { role: 'admin' } });
+      await makeAdmin(db, 'limit@example.com');
 
       await request(app.getHttpServer())
         .get('/api/v1/users?pageSize=101')

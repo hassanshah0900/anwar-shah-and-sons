@@ -10,15 +10,17 @@ import {
 } from '@repo/shared';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
-import { PrismaService } from '../src/prisma/prisma.service.js';
 import { createTestApp, WEB_ORIGIN } from './support/app.js';
 import { adminApi } from './support/catalog.js';
-import { resetCatalog } from './support/database.js';
 import { signUpAs } from './support/users.js';
+import { eq } from 'drizzle-orm';
+import type { Database } from '../src/db/connection.js';
+import { orderItems, orders, products, reviews, users } from '../src/db/schema/index.js';
+import { resetCatalog, testDatabase } from './support/database.js';
 
 describe('Reviews (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let db: Database;
   let productId: string;
   let otherId: string;
 
@@ -29,12 +31,16 @@ describe('Reviews (e2e)', () => {
   /** A customer with an order for the kurta in the given status. */
   async function customer(email: string, status: OrderStatus | null = 'delivered') {
     const cookies = await signUpAs(app, email);
-    const user = await prisma.user.findUniqueOrThrow({ where: { email } });
-    await prisma.user.update({ where: { id: user.id }, data: { name: 'Sana Tariq Malik' } });
+    const [user] = await db
+      .update(users)
+      .set({ name: 'Sana Tariq Malik' })
+      .where(eq(users.email, email))
+      .returning({ id: users.id });
     if (status) {
-      await prisma.order.create({
-        data: {
-          userId: user.id,
+      const [order] = await db
+        .insert(orders)
+        .values({
+          userId: user!.id,
           email,
           status,
           paymentMethod: 'cod',
@@ -46,18 +52,17 @@ describe('Reviews (e2e)', () => {
           phone: '+92 300 1234567',
           line1: '1 Mall Road',
           city: 'Lahore',
-          items: {
-            create: {
-              productId,
-              productName: 'Lawn Kurta',
-              variantLabel: 'M',
-              sku: 'KURTA-M',
-              unitPrice: 4990,
-              quantity: 1,
-              lineTotal: 4990,
-            },
-          },
-        },
+        })
+        .returning({ id: orders.id });
+      await db.insert(orderItems).values({
+        orderId: order!.id,
+        productId,
+        productName: 'Lawn Kurta',
+        variantLabel: 'M',
+        sku: 'KURTA-M',
+        unitPrice: 4990,
+        quantity: 1,
+        lineTotal: 4990,
       });
     }
     return cookies;
@@ -65,17 +70,17 @@ describe('Reviews (e2e)', () => {
 
   beforeAll(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
-    await prisma.order.deleteMany();
-    await resetCatalog(prisma);
-    await prisma.user.deleteMany();
+    db = testDatabase(app);
+    await db.delete(orders);
+    await resetCatalog(db);
+    await db.delete(users);
     const admin = adminApi(app, await signUpAs(app, 'reviews-admin@example.com', 'admin'));
     const categoryId = (await admin.post('/categories', { name: 'Kurtas' }).expect(201)).body.id;
     const create = async (name: string) =>
       (await admin.post('/products', { name, categoryId, price: 4990 }).expect(201)).body.id;
     productId = await create('Lawn Kurta');
     otherId = await create('Silk Kurta');
-    await prisma.product.updateMany({ data: { status: 'active' } });
+    await db.update(products).set({ status: 'active' });
   });
 
   afterAll(async () => {
@@ -192,7 +197,7 @@ describe('Reviews (e2e)', () => {
   });
 
   it('removes reviews with their product', async () => {
-    await prisma.product.delete({ where: { id: productId } });
-    expect(await prisma.review.count()).toBe(0);
+    await db.delete(products).where(eq(products.id, productId));
+    expect(await db.$count(reviews)).toBe(0);
   });
 });

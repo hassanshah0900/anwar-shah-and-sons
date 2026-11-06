@@ -6,19 +6,15 @@ import { App } from 'supertest/types.js';
 import { AppModule } from '../src/app.module.js';
 import { appOptions, configureApp } from '../src/app.setup.js';
 import { DATABASE } from '../src/db/database.module.js';
-import { PrismaService } from '../src/prisma/prisma.service.js';
 
 describe('GET /api/health (e2e)', () => {
   const db = { execute: vi.fn() };
-  const prisma = { $disconnect: vi.fn() };
   let app: INestApplication<App>;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(DATABASE)
       .useValue(db)
-      .overrideProvider(PrismaService)
-      .useValue(prisma)
       .compile();
 
     app = moduleRef.createNestApplication({ ...appOptions, logger: false });
