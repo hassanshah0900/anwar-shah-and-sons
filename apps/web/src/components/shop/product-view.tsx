@@ -86,7 +86,8 @@ export function ProductView({
           />
         ))}
 
-        <div className="flex flex-col gap-3">
+        {/* On phones the button stays in reach while scrolling the details below. */}
+        <div className="flex flex-col gap-3 max-lg:sticky max-lg:bottom-0 max-lg:z-10 max-lg:-mx-4 max-lg:border-t max-lg:bg-background max-lg:px-4 max-lg:py-3 sm:max-lg:-mx-6 sm:max-lg:px-6">
           <AddToBag variant={variant} missing={missing.map((option) => option.name)} />
           {variant && (
             <p

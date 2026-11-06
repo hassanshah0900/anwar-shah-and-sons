@@ -3,7 +3,9 @@ import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { PageBreadcrumbs } from '@/components/layout/page-breadcrumbs';
 import { JsonLd } from '@/components/seo/json-ld';
+import { ProductInfo } from '@/components/shop/product-info';
 import { ProductView } from '@/components/shop/product-view';
+import { RelatedProducts } from '@/components/shop/related-products';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getProductDetail } from '@/lib/api/catalog';
 import { ApiError } from '@/lib/api/server';
@@ -81,15 +83,13 @@ async function Product({ params, searchParams }: Props) {
           </>
         }
       >
-        {product.description && (
-          <section className="flex flex-col gap-3 border-t pt-8">
-            <h2 className="font-sans text-xs font-medium tracking-widest text-muted-foreground uppercase">
-              Details
-            </h2>
-            <p className="text-sm leading-7 whitespace-pre-line">{product.description}</p>
-          </section>
-        )}
+        <ProductInfo product={product} store={store} />
       </ProductView>
+      <div className="mt-16">
+        <Suspense fallback={null}>
+          <RelatedProducts product={product} />
+        </Suspense>
+      </div>
     </>
   );
 }
