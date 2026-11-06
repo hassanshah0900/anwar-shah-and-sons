@@ -7,75 +7,90 @@ import {
   type ProductListQuery,
   type ProductUpdate,
 } from '@repo/shared';
+import { and, asc, desc, eq, exists, inArray, or, sql } from 'drizzle-orm';
 import { invalidField } from '../../common/zod-validation.pipe.js';
-import type { Prisma } from '../../generated/prisma/client.js';
-import { PrismaService } from '../../prisma/prisma.service.js';
+import type { Database } from '../../db/connection.js';
+import { InjectDatabase } from '../../db/database.module.js';
+import { containsInsensitive, found, orNotFound, touch } from '../../db/queries.js';
+import {
+  categories,
+  optionTypes,
+  productImages,
+  productOptions,
+  products,
+  productVariants,
+} from '../../db/schema/index.js';
 import { ImagesService } from './images.service.js';
-import { productSelect, toProduct } from './product.mapper.js';
+import { findProduct } from './product.mapper.js';
 
 const NEEDS_VARIANT = 'Add at least one variant before publishing';
 
 @Injectable()
 export class ProductsService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectDatabase() private readonly db: Database,
     private readonly images: ImagesService,
   ) {}
 
   async list(query: ProductListQuery): Promise<ProductList> {
-    const where: Prisma.ProductWhereInput = {
-      status: query.status,
-      categoryId: query.categoryId,
-      ...(query.q && {
-        OR: [
-          { name: { contains: query.q, mode: 'insensitive' } },
-          { variants: { some: { sku: { contains: query.q, mode: 'insensitive' } } } },
-        ],
-      }),
-    };
+    const where = and(
+      query.status ? eq(products.status, query.status) : undefined,
+      query.categoryId ? eq(products.categoryId, query.categoryId) : undefined,
+      query.q
+        ? or(
+            containsInsensitive(products.name, query.q),
+            exists(
+              this.db
+                .select({ id: productVariants.id })
+                .from(productVariants)
+                .where(
+                  and(
+                    eq(productVariants.productId, products.id),
+                    containsInsensitive(productVariants.sku, query.q),
+                  ),
+                ),
+            ),
+          )
+        : undefined,
+    );
 
-    const [rows, total] = await this.prisma.$transaction([
-      this.prisma.product.findMany({
-        where,
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          status: true,
-          price: true,
-          updatedAt: true,
-          category: { select: { id: true, name: true } },
-          _count: { select: { variants: true } },
-        },
-        orderBy: { updatedAt: 'desc' },
-        take: query.pageSize,
-        skip: (query.page - 1) * query.pageSize,
-      }),
-      this.prisma.product.count({ where }),
+    const [rows, total] = await Promise.all([
+      this.db
+        .select({
+          id: products.id,
+          name: products.name,
+          slug: products.slug,
+          status: products.status,
+          price: products.price,
+          updatedAt: products.updatedAt,
+          category: { id: categories.id, name: categories.name },
+          variantCount: sql<number>`(
+            SELECT count(*)::int FROM ${productVariants}
+            WHERE ${productVariants.productId} = ${products.id})`,
+          totalStock: sql<number>`(
+            SELECT coalesce(sum(${productVariants.stock}), 0)::int FROM ${productVariants}
+            WHERE ${productVariants.productId} = ${products.id})`,
+        })
+        .from(products)
+        .innerJoin(categories, eq(categories.id, products.categoryId))
+        .where(where)
+        .orderBy(desc(products.updatedAt))
+        .limit(query.pageSize)
+        .offset((query.page - 1) * query.pageSize),
+      this.db.$count(products, where),
     ]);
 
-    const stock = await this.prisma.productVariant.groupBy({
-      by: ['productId'],
-      where: { productId: { in: rows.map((row) => row.id) } },
-      _sum: { stock: true },
-    });
-    const stockById = new Map(stock.map((entry) => [entry.productId, entry._sum.stock ?? 0]));
-
     return {
-      products: rows.map(({ _count, updatedAt, ...row }) => ({
+      products: rows.map(({ updatedAt, ...row }) => ({
         ...row,
-        variantCount: _count.variants,
-        totalStock: stockById.get(row.id) ?? 0,
         updatedAt: updatedAt.toISOString(),
       })),
       total,
     };
   }
 
-  async get(id: string): Promise<Product> {
-    return toProduct(
-      await this.prisma.product.findUniqueOrThrow({ where: { id }, select: productSelect }),
-    );
+  get(id: string): Promise<Product> {
+    return findProduct(this.db, id);
   }
 
   async create(input: ProductInput): Promise<Product> {
@@ -84,35 +99,46 @@ export class ProductsService {
     await this.assertCategory(input.categoryId);
     await this.assertOptionTypes(input.optionTypeIds);
 
-    const row = await this.prisma.product.create({
-      select: productSelect,
-      data: {
-        name: input.name,
-        slug: input.slug ?? slugify(input.name),
-        description: input.description ?? null,
-        categoryId: input.categoryId,
-        status: input.status,
-        price: input.price,
-        compareAtPrice: input.compareAtPrice ?? null,
-        options: {
-          create: input.optionTypeIds.map((optionTypeId, position) => ({ optionTypeId, position })),
-        },
-      },
+    return this.db.transaction(async (tx) => {
+      const { id } = found(
+        await tx
+          .insert(products)
+          .values({
+            name: input.name,
+            slug: input.slug ?? slugify(input.name),
+            description: input.description ?? null,
+            categoryId: input.categoryId,
+            status: input.status,
+            price: input.price,
+            compareAtPrice: input.compareAtPrice ?? null,
+          })
+          .returning({ id: products.id }),
+      );
+      if (input.optionTypeIds.length) {
+        await tx.insert(productOptions).values(
+          input.optionTypeIds.map((optionTypeId, position) => ({
+            productId: id,
+            optionTypeId,
+            position,
+          })),
+        );
+      }
+      return findProduct(tx, id);
     });
-    return toProduct(row);
   }
 
   async update(id: string, input: ProductUpdate): Promise<Product> {
-    const current = await this.prisma.product.findUniqueOrThrow({
-      where: { id },
-      select: {
-        price: true,
-        compareAtPrice: true,
-        options: { select: { optionTypeId: true }, orderBy: { position: 'asc' } },
-        _count: { select: { variants: true } },
-      },
-    });
-    const hasVariants = current._count.variants > 0;
+    const current = orNotFound(
+      await this.db.query.products.findFirst({
+        where: eq(products.id, id),
+        columns: { price: true, compareAtPrice: true },
+        with: {
+          options: { columns: { optionTypeId: true }, orderBy: [asc(productOptions.position)] },
+        },
+      }),
+    );
+    const hasVariants =
+      (await this.db.$count(productVariants, eq(productVariants.productId, id))) > 0;
 
     if (input.status === 'active' && !hasVariants) throw invalidField('status', NEEDS_VARIANT);
     if (input.categoryId) await this.assertCategory(input.categoryId);
@@ -133,51 +159,61 @@ export class ProductsService {
     }
     if (optionsChanged) await this.assertOptionTypes(optionTypeIds);
 
-    const row = await this.prisma.$transaction(async (tx) => {
+    return this.db.transaction(async (tx) => {
       if (optionsChanged) {
-        await tx.productOption.deleteMany({ where: { productId: id } });
-        await tx.productOption.createMany({
-          data: optionTypeIds.map((optionTypeId, position) => ({
-            productId: id,
-            optionTypeId,
-            position,
-          })),
-        });
+        await tx.delete(productOptions).where(eq(productOptions.productId, id));
+        if (optionTypeIds.length) {
+          await tx.insert(productOptions).values(
+            optionTypeIds.map((optionTypeId, position) => ({
+              productId: id,
+              optionTypeId,
+              position,
+            })),
+          );
+        }
       }
-      return tx.product.update({
-        where: { id },
-        select: productSelect,
-        data: {
-          name: input.name,
-          slug: input.slug,
-          description: input.description,
-          categoryId: input.categoryId,
-          status: input.status,
-          price: input.price,
-          compareAtPrice: input.compareAtPrice,
-        },
-      });
+      found(
+        await tx
+          .update(products)
+          .set(
+            touch({
+              name: input.name,
+              slug: input.slug,
+              description: input.description,
+              categoryId: input.categoryId,
+              status: input.status,
+              price: input.price,
+              compareAtPrice: input.compareAtPrice,
+            }),
+          )
+          .where(eq(products.id, id))
+          .returning({ id: products.id }),
+      );
+      return findProduct(tx, id);
     });
-    return toProduct(row);
   }
 
   /** Deletes the product, its variants and images, then the stored image files. */
   async remove(id: string): Promise<void> {
-    const product = await this.prisma.product.delete({
-      where: { id },
-      select: { images: { select: { storageKey: true } } },
+    const keys = await this.db.transaction(async (tx) => {
+      const images = await tx
+        .select({ storageKey: productImages.storageKey })
+        .from(productImages)
+        .where(eq(productImages.productId, id));
+      found(await tx.delete(products).where(eq(products.id, id)).returning({ id: products.id }));
+      return images.map((image) => image.storageKey);
     });
-    await this.images.deleteStored(product.images.map((image) => image.storageKey));
+    await this.images.deleteStored(keys);
   }
 
   private async assertCategory(id: string): Promise<void> {
-    const found = await this.prisma.category.count({ where: { id } });
-    if (!found) throw invalidField('categoryId', 'Choose an existing category');
+    const count = await this.db.$count(categories, eq(categories.id, id));
+    if (!count) throw invalidField('categoryId', 'Choose an existing category');
   }
 
   private async assertOptionTypes(ids: string[]): Promise<void> {
     if (!ids.length) return;
-    const found = await this.prisma.optionType.count({ where: { id: { in: ids } } });
-    if (found !== ids.length) throw invalidField('optionTypeIds', 'Choose existing options');
+    const count = await this.db.$count(optionTypes, inArray(optionTypes.id, ids));
+    if (count !== ids.length) throw invalidField('optionTypeIds', 'Choose existing options');
   }
 }

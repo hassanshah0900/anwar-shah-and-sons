@@ -1,8 +1,18 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import type { Product, VariantInput, VariantUpdate } from '@repo/shared';
 import { invalidField } from '../../common/zod-validation.pipe.js';
-import { PrismaService } from '../../prisma/prisma.service.js';
-import { productSelect, toProduct } from './product.mapper.js';
+import { and, asc, eq, inArray, like } from 'drizzle-orm';
+import type { Database } from '../../db/connection.js';
+import { InjectDatabase } from '../../db/database.module.js';
+import { found, nextPosition, orNotFound, type Queryable, touch } from '../../db/queries.js';
+import {
+  optionValues,
+  productOptions,
+  products,
+  productVariants,
+  variantOptionValues,
+} from '../../db/schema/index.js';
+import { findProduct } from './product.mapper.js';
 
 /** Generating more variants than this at once is almost certainly a mistake. */
 export const MAX_GENERATED_VARIANTS = 100;
@@ -32,80 +42,96 @@ export function skuFor(productSlug: string, valueSlugs: string[]): string {
 
 @Injectable()
 export class VariantsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@InjectDatabase() private readonly db: Database) {}
 
   async create(productId: string, input: VariantInput): Promise<Product> {
     const optionTypeIds = await this.optionTypeIdsOf(productId);
     await this.assertOneValuePerOption(optionTypeIds, input.optionValueIds);
 
     const key = combinationKey(input.optionValueIds);
-    const exists = await this.prisma.productVariant.count({
-      where: { productId, combinationKey: key },
-    });
+    const exists = await this.db.$count(
+      productVariants,
+      and(eq(productVariants.productId, productId), eq(productVariants.combinationKey, key)),
+    );
     if (exists) throw invalidField('optionValueIds', 'This combination already exists');
 
-    await this.prisma.productVariant.create({
-      data: {
+    return this.db.transaction(async (tx) => {
+      await insertVariant(tx, {
         productId,
         sku: input.sku,
         price: input.price ?? null,
         stock: input.stock,
-        position: await this.nextPosition(productId),
+        position: await nextPosition(tx, productVariants, eq(productVariants.productId, productId)),
         combinationKey: key,
-        optionValues: {
-          create: input.optionValueIds.map((optionValueId) => ({ optionValueId })),
-        },
-      },
+        optionValueIds: input.optionValueIds,
+      });
+      return findProduct(tx, productId);
     });
-    return this.product(productId);
   }
 
   async update(productId: string, variantId: string, input: VariantUpdate): Promise<Product> {
-    await this.prisma.productVariant.update({
-      where: { id: variantId, productId },
-      data: { sku: input.sku, price: input.price, stock: input.stock },
-    });
-    return this.product(productId);
+    found(
+      await this.db
+        .update(productVariants)
+        .set(touch({ sku: input.sku, price: input.price, stock: input.stock }))
+        .where(and(eq(productVariants.id, variantId), eq(productVariants.productId, productId)))
+        .returning({ id: productVariants.id }),
+    );
+    return findProduct(this.db, productId);
   }
 
   async remove(productId: string, variantId: string): Promise<Product> {
-    const product = await this.prisma.product.findUniqueOrThrow({
-      where: { id: productId },
-      select: { status: true, _count: { select: { variants: true } } },
-    });
-    if (product.status === 'active' && product._count.variants <= 1) {
+    const product = orNotFound(
+      await this.db.query.products.findFirst({
+        where: eq(products.id, productId),
+        columns: { status: true },
+      }),
+    );
+    const variantCount = await this.db.$count(
+      productVariants,
+      eq(productVariants.productId, productId),
+    );
+    if (product.status === 'active' && variantCount <= 1) {
       throw new ConflictException(
         'An active product needs a variant. Unpublish it before removing the last one.',
       );
     }
 
-    await this.prisma.productVariant.delete({ where: { id: variantId, productId } });
-    return this.product(productId);
+    found(
+      await this.db
+        .delete(productVariants)
+        .where(and(eq(productVariants.id, variantId), eq(productVariants.productId, productId)))
+        .returning({ id: productVariants.id }),
+    );
+    return findProduct(this.db, productId);
   }
 
   /** Creates every combination of the product's option values that doesn't exist yet. */
   async generate(productId: string): Promise<Product> {
-    const product = await this.prisma.product.findUniqueOrThrow({
-      where: { id: productId },
-      select: {
-        slug: true,
-        options: {
-          orderBy: { position: 'asc' },
-          select: {
-            optionType: {
-              select: {
-                name: true,
-                values: {
-                  select: { id: true, slug: true },
-                  orderBy: [{ position: 'asc' }, { label: 'asc' }],
+    const product = orNotFound(
+      await this.db.query.products.findFirst({
+        where: eq(products.id, productId),
+        columns: { slug: true },
+        with: {
+          options: {
+            columns: {},
+            orderBy: [asc(productOptions.position)],
+            with: {
+              optionType: {
+                columns: { name: true },
+                with: {
+                  values: {
+                    columns: { id: true, slug: true },
+                    orderBy: [asc(optionValues.position), asc(optionValues.label)],
+                  },
                 },
               },
             },
           },
+          variants: { columns: { combinationKey: true } },
         },
-        variants: { select: { combinationKey: true } },
-      },
-    });
+      }),
+    );
 
     const valueLists = product.options.map((option) => option.optionType.values);
     const empty = product.options.find((option) => option.optionType.values.length === 0);
@@ -121,58 +147,61 @@ export class VariantsService {
       );
     }
 
-    const taken = new Set(
-      (
-        await this.prisma.productVariant.findMany({
-          where: { sku: { startsWith: product.slug.toUpperCase() } },
-          select: { sku: true },
-        })
-      ).map((variant) => variant.sku),
-    );
-    let position = await this.nextPosition(productId);
+    return this.db.transaction(async (tx) => {
+      const prefix = product.slug.toUpperCase().replace(/[\\%_]/g, '\\$&');
+      const taken = new Set(
+        (
+          await tx
+            .select({ sku: productVariants.sku })
+            .from(productVariants)
+            .where(like(productVariants.sku, `${prefix}%`))
+        ).map((variant) => variant.sku),
+      );
+      let position = await nextPosition(
+        tx,
+        productVariants,
+        eq(productVariants.productId, productId),
+      );
 
-    await this.prisma.$transaction(
-      missing.map((combo) => {
-        const sku = uniqueSku(
-          skuFor(
-            product.slug,
-            combo.map((value) => value.slug),
+      for (const combo of missing) {
+        await insertVariant(tx, {
+          productId,
+          sku: uniqueSku(
+            skuFor(
+              product.slug,
+              combo.map((value) => value.slug),
+            ),
+            taken,
           ),
-          taken,
-        );
-        return this.prisma.productVariant.create({
-          data: {
-            productId,
-            sku,
-            position: position++,
-            combinationKey: combinationKey(combo.map((value) => value.id)),
-            optionValues: { create: combo.map((value) => ({ optionValueId: value.id })) },
-          },
+          price: null,
+          stock: 0,
+          position: position++,
+          combinationKey: combinationKey(combo.map((value) => value.id)),
+          optionValueIds: combo.map((value) => value.id),
         });
-      }),
-    );
-    return this.product(productId);
-  }
-
-  private async product(id: string): Promise<Product> {
-    return toProduct(
-      await this.prisma.product.findUniqueOrThrow({ where: { id }, select: productSelect }),
-    );
+      }
+      return findProduct(tx, productId);
+    });
   }
 
   private async optionTypeIdsOf(productId: string): Promise<string[]> {
-    const product = await this.prisma.product.findUniqueOrThrow({
-      where: { id: productId },
-      select: { options: { select: { optionTypeId: true } } },
-    });
+    const product = orNotFound(
+      await this.db.query.products.findFirst({
+        where: eq(products.id, productId),
+        columns: {},
+        with: { options: { columns: { optionTypeId: true } } },
+      }),
+    );
     return product.options.map((option) => option.optionTypeId);
   }
 
   private async assertOneValuePerOption(optionTypeIds: string[], valueIds: string[]) {
-    const values = await this.prisma.optionValue.findMany({
-      where: { id: { in: valueIds } },
-      select: { optionTypeId: true },
-    });
+    const values = valueIds.length
+      ? await this.db
+          .select({ optionTypeId: optionValues.optionTypeId })
+          .from(optionValues)
+          .where(inArray(optionValues.id, valueIds))
+      : [];
     const types = values.map((value) => value.optionTypeId);
     const valid =
       values.length === valueIds.length &&
@@ -181,13 +210,19 @@ export class VariantsService {
       types.every((type) => optionTypeIds.includes(type));
     if (!valid) throw invalidField('optionValueIds', 'Choose one value for each option');
   }
+}
 
-  private async nextPosition(productId: string): Promise<number> {
-    const last = await this.prisma.productVariant.aggregate({
-      where: { productId },
-      _max: { position: true },
-    });
-    return (last._max.position ?? -1) + 1;
+type NewVariant = typeof productVariants.$inferInsert & { optionValueIds: string[] };
+
+/** Inserts a variant with the option values that define it. */
+async function insertVariant(tx: Queryable, { optionValueIds, ...variant }: NewVariant) {
+  const { id } = found(
+    await tx.insert(productVariants).values(variant).returning({ id: productVariants.id }),
+  );
+  if (optionValueIds.length) {
+    await tx
+      .insert(variantOptionValues)
+      .values(optionValueIds.map((optionValueId) => ({ variantId: id, optionValueId })));
   }
 }
 
