@@ -4,8 +4,12 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   images: {
-    // Product images are served from /media (proxied from the API); allow only those.
-    localPatterns: [{ pathname: '/media/**', search: '' }],
+    // Product images are served from /media (proxied from the API); site photos live in
+    // public/images. Allow only those.
+    localPatterns: [
+      { pathname: '/media/**', search: '' },
+      { pathname: '/images/**', search: '' },
+    ],
   },
   experimental: {
     serverActions: {
