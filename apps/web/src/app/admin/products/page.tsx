@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import { productListQuerySchema, productStatuses, type ProductListQuery } from '@repo/shared';
 import { ProductStatusBadge } from '@/components/admin/product-status-badge';
+import { Pagination } from '@/components/shop/pagination';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -154,23 +155,12 @@ async function Products({ searchParams }: { searchParams: SearchParams }) {
       )}
 
       {pages > 1 && (
-        <nav aria-label="Pagination" className="mt-6 flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">
+        <div className="mt-6 flex items-center justify-between gap-4">
+          <p className="text-sm text-muted-foreground">
             Page {query.page} of {pages} · {total} products
-          </span>
-          <div className="flex gap-2">
-            {query.page > 1 && (
-              <Button variant="outline" size="sm" asChild>
-                <Link href={href({ page: query.page - 1 })}>Previous</Link>
-              </Button>
-            )}
-            {query.page < pages && (
-              <Button variant="outline" size="sm" asChild>
-                <Link href={href({ page: query.page + 1 })}>Next</Link>
-              </Button>
-            )}
-          </div>
-        </nav>
+          </p>
+          <Pagination page={query.page} pages={pages} href={(page) => href({ page })} />
+        </div>
       )}
     </>
   );
