@@ -66,7 +66,7 @@ cp .env.example .env                          # choose a POSTGRES_PASSWORD
 cp api/.env.example api/.env        # use the same password in DATABASE_URL
 cp web/.env.example web/.env.local
 
-docker compose up -d                          # PostgreSQL on localhost:5432
+docker compose up -d db                       # PostgreSQL on localhost:5432
 npm run db:migrate -w api                     # apply database migrations
 npm run db:seed -w api                        # create the admin from ADMIN_* in api/.env
 npm run db:seed:demo -w api                   # optional: demo catalog, customers and orders
@@ -88,6 +88,14 @@ a Compose secret, not an environment variable. Stop it with `docker compose down
 to delete its data. Production uses Aurora PostgreSQL, provisioned in the infrastructure
 repository.
 
+### Running the Docker images
+
+`docker compose up -d --build` builds the images from `web/Dockerfile` and `api/Dockerfile`
+and runs the whole stack: the database, a one-off `migrate` container, the API and the web app
+on http://localhost:3000. The API reads `api/.env`, with `DATABASE_URL` pointed at the `db`
+container. Stop `npm run dev` first, since both use port 3000. Uploaded images stay in the API
+container, so they're lost when it's recreated.
+
 | App | URL                              |
 | --- | -------------------------------- |
 | web | http://localhost:3000            |
@@ -96,7 +104,8 @@ repository.
 
 ### Scripts
 
-Run from the repository root. Turborepo runs each task in every workspace that defines it.
+Run from the repository root. Each task builds `shared` first, then runs in every workspace
+that defines it.
 
 | Command                | Description                                   |
 | ---------------------- | --------------------------------------------- |
