@@ -1,40 +1,16 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import {
+  categoryItem,
+  choose,
+  confirmDelete,
+  createCategory,
+  createOption,
+  dialog,
+  openDialog,
+  PIXEL,
+  unique,
+} from './admin-helpers.ts';
 import { main, newAdmin } from './helpers.ts';
-
-/** Names of their own, so a rerun against the same data doesn't clash. */
-const unique = (name: string) => `${name} ${Date.now().toString(36)}`;
-
-/** The smallest valid PNG: one transparent pixel. */
-const PIXEL = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-  'base64',
-);
-
-const dialog = (page: Page) => page.getByRole('dialog');
-
-/** Opens a shadcn select by its label and picks an option. */
-async function choose(page: Page, scope: Page | Locator, label: string, option: string) {
-  await scope.getByLabel(label, { exact: true }).click();
-  await page.getByRole('option', { name: option, exact: true }).click();
-}
-
-async function confirmDelete(page: Page, label: string) {
-  await main(page).getByRole('button', { name: label, exact: true }).click();
-  await dialog(page).getByRole('button', { name: 'Delete' }).click();
-}
-
-async function createCategory(page: Page, name: string, parent?: string) {
-  await main(page).getByRole('button', { name: 'New category' }).click();
-  await dialog(page).getByLabel('Name', { exact: true }).fill(name);
-  if (parent) await choose(page, dialog(page), 'Parent', parent);
-  await dialog(page).getByRole('button', { name: 'Save' }).click();
-  await expect(dialog(page)).toHaveCount(0);
-}
-
-const categoryRow = (page: Page, name: string) =>
-  main(page)
-    .getByRole('row')
-    .filter({ has: page.getByRole('cell', { name, exact: true }) });
 
 test('an admin builds the category tree', async ({ browser }) => {
   const admin = await newAdmin(browser);
@@ -44,7 +20,7 @@ test('an admin builds the category tree', async ({ browser }) => {
 
   await createCategory(admin, parent);
   await createCategory(admin, child, parent);
-  await expect(categoryRow(admin, child)).toContainText(parent);
+  await expect(categoryItem(admin, parent)).toContainText(child);
 
   // Renaming keeps it under its parent.
   const renamed = unique('Gharara');
@@ -53,8 +29,8 @@ test('an admin builds the category tree', async ({ browser }) => {
     .click();
   await dialog(admin).getByLabel('Name').fill(renamed);
   await dialog(admin).getByRole('button', { name: 'Save' }).click();
-  await expect(categoryRow(admin, renamed)).toContainText(parent);
-  await expect(categoryRow(admin, child)).toHaveCount(0);
+  await expect(categoryItem(admin, parent)).toContainText(renamed);
+  await expect(categoryItem(admin, child)).toHaveCount(0);
 
   // A parent can't go while it has sub-categories.
   await confirmDelete(admin, `Delete ${parent}`);
@@ -62,9 +38,9 @@ test('an admin builds the category tree', async ({ browser }) => {
   await dialog(admin).getByRole('button', { name: 'Cancel' }).click();
 
   await confirmDelete(admin, `Delete ${renamed}`);
-  await expect(categoryRow(admin, renamed)).toHaveCount(0);
+  await expect(categoryItem(admin, renamed)).toHaveCount(0);
   await confirmDelete(admin, `Delete ${parent}`);
-  await expect(categoryRow(admin, parent)).toHaveCount(0);
+  await expect(categoryItem(admin, parent)).toHaveCount(0);
 });
 
 test('an admin sets up an option and its values', async ({ browser }) => {
@@ -72,7 +48,7 @@ test('an admin sets up an option and its values', async ({ browser }) => {
   const name = unique('Shade');
   await admin.goto('/admin/options');
 
-  await main(admin).getByRole('button', { name: 'New option' }).click();
+  await openDialog(admin, main(admin).getByRole('button', { name: 'New option' }));
   await dialog(admin).getByLabel('Name').fill(name);
   await dialog(admin).getByRole('radio', { name: 'Colours with a swatch' }).click();
   await dialog(admin).getByRole('button', { name: 'Save' }).click();
@@ -116,16 +92,7 @@ test('an admin creates a product, publishes it and deletes it', async ({ browser
   // Something to file it under, and a way for it to vary.
   await admin.goto('/admin/categories');
   await createCategory(admin, category);
-  await admin.goto('/admin/options');
-  await main(admin).getByRole('button', { name: 'New option' }).click();
-  await dialog(admin).getByLabel('Name').fill(option);
-  await dialog(admin).getByRole('button', { name: 'Save' }).click();
-  const section = main(admin).getByRole('region', { name: option, exact: true });
-  for (const label of ['Short', 'Long']) {
-    await section.getByLabel(`New ${option.toLowerCase()} value`).fill(label);
-    await section.getByRole('button', { name: 'Add' }).click();
-    await expect(section.getByRole('listitem').filter({ hasText: label })).toBeVisible();
-  }
+  await createOption(admin, option, ['Short', 'Long']);
 
   // The product starts as a draft: it can't go live without variants.
   await admin.goto('/admin/products');
