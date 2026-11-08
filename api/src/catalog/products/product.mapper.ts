@@ -3,6 +3,13 @@ import { asc, eq } from 'drizzle-orm';
 import { orNotFound, type Queryable } from '../../db/queries.js';
 import { productImages, productOptions, products, productVariants } from '../../db/schema/index.js';
 
+/** Fails with a 404 unless the product exists. */
+export async function assertProduct(db: Queryable, id: string): Promise<void> {
+  orNotFound(
+    await db.query.products.findFirst({ where: eq(products.id, id), columns: { id: true } }),
+  );
+}
+
 /** A product as the admin sees it, or a 404. */
 export async function findProduct(db: Queryable, id: string): Promise<Product> {
   const row = await db.query.products.findFirst({

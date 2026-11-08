@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -13,8 +14,10 @@ import {
   ADMIN_ROLE,
   MAX_IMAGE_BYTES,
   productImageUpdateSchema,
+  reorderSchema,
   type Product,
   type ProductImageUpdate,
+  type Reorder,
 } from '@repo/shared';
 import { Roles } from '@thallesp/nestjs-better-auth';
 import { z } from 'zod';
@@ -48,6 +51,14 @@ export class ImagesController {
   ): Promise<Product> {
     if (!file) throw invalidField('file', 'Choose an image to upload');
     return this.images.upload(productId, { buffer: file.buffer, ...fields });
+  }
+
+  @Put('order')
+  reorder(
+    @Param('productId') productId: string,
+    @Body(new ZodValidationPipe(reorderSchema)) { ids }: Reorder,
+  ): Promise<Product> {
+    return this.images.reorder(productId, ids);
   }
 
   @Patch(':imageId')

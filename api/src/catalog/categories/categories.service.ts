@@ -1,9 +1,9 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { slugify, type Category, type CategoryInput } from '@repo/shared';
+import { slugify, type Category, type CategoryInput, type CategoryReorder } from '@repo/shared';
 import { asc, eq, isNull } from 'drizzle-orm';
 import type { Database } from '../../db/connection.js';
 import { InjectDatabase } from '../../db/database.module.js';
-import { found, nextPosition, touch } from '../../db/queries.js';
+import { found, nextPosition, saveOrder, touch } from '../../db/queries.js';
 import { categories } from '../../db/schema/index.js';
 
 const categoryColumns = {
@@ -68,6 +68,20 @@ export class CategoriesService {
       .where(eq(categories.id, id))
       .returning(categoryColumns);
     return found(rows);
+  }
+
+  /** Orders the sub-categories of one parent, or the top level when it's null. */
+  async reorder({ parentId, ids }: CategoryReorder): Promise<Category[]> {
+    if (parentId) await this.assertExists(parentId);
+    await this.db.transaction((tx) =>
+      saveOrder(
+        tx,
+        categories,
+        parentId ? eq(categories.parentId, parentId) : isNull(categories.parentId),
+        ids,
+      ),
+    );
+    return this.list();
   }
 
   /** Fails with 409 while the category still has sub-categories or products. */

@@ -11,7 +11,13 @@ import { and, asc, count, desc, eq, exists, inArray, or, sum } from 'drizzle-orm
 import { invalidField } from '../../common/zod-validation.pipe.js';
 import type { Database } from '../../db/connection.js';
 import { InjectDatabase } from '../../db/database.module.js';
-import { containsInsensitive, found, orNotFound, touch } from '../../db/queries.js';
+import {
+  assertSameItems,
+  containsInsensitive,
+  found,
+  orNotFound,
+  touch,
+} from '../../db/queries.js';
 import {
   categories,
   optionTypes,
@@ -21,7 +27,7 @@ import {
   productVariants,
 } from '../../db/schema/index.js';
 import { ImagesService } from './images.service.js';
-import { findProduct } from './product.mapper.js';
+import { assertProduct, findProduct } from './product.mapper.js';
 
 const NEEDS_VARIANT = 'Add at least one variant before publishing';
 
@@ -164,10 +170,17 @@ export class ProductsService {
       throw invalidField('compareAtPrice', 'The compare-at price must be higher than the price');
     }
 
-    const optionTypeIds = input.optionTypeIds;
+    // Which options, not their order: that's saved by reorderOptions. Kept options keep
+    // their place and new ones go last, so saving the form doesn't undo a reorder.
+    const currentIds = current.options.map((option) => option.optionTypeId);
+    const optionTypeIds = input.optionTypeIds && [
+      ...currentIds.filter((optionTypeId) => input.optionTypeIds?.includes(optionTypeId)),
+      ...input.optionTypeIds.filter((optionTypeId) => !currentIds.includes(optionTypeId)),
+    ];
     const optionsChanged =
       optionTypeIds !== undefined &&
-      optionTypeIds.join() !== current.options.map((option) => option.optionTypeId).join();
+      (optionTypeIds.length !== currentIds.length ||
+        optionTypeIds.some((optionTypeId) => !currentIds.includes(optionTypeId)));
     if (optionsChanged && hasVariants) {
       throw new ConflictException("Remove the variants before changing the product's options");
     }
@@ -205,6 +218,30 @@ export class ProductsService {
       );
       return findProduct(tx, id);
     });
+  }
+
+  /** The order options are shown in, e.g. Colour before Size. Allowed with variants. */
+  async reorderOptions(id: string, optionTypeIds: string[]): Promise<Product> {
+    await assertProduct(this.db, id);
+    await this.db.transaction(async (tx) => {
+      const options = await tx
+        .select({ optionTypeId: productOptions.optionTypeId })
+        .from(productOptions)
+        .where(eq(productOptions.productId, id));
+      assertSameItems(
+        optionTypeIds,
+        options.map((option) => option.optionTypeId),
+      );
+      for (const [position, optionTypeId] of optionTypeIds.entries()) {
+        await tx
+          .update(productOptions)
+          .set({ position })
+          .where(
+            and(eq(productOptions.productId, id), eq(productOptions.optionTypeId, optionTypeId)),
+          );
+      }
+    });
+    return findProduct(this.db, id);
   }
 
   /** Deletes the product, its variants and images, then the stored image files. */

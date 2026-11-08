@@ -1,10 +1,12 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put } from '@nestjs/common';
 import {
   ADMIN_ROLE,
   categoryInputSchema,
+  categoryReorderSchema,
   type Category,
   type CategoryInput,
   type CategoryList,
+  type CategoryReorder,
 } from '@repo/shared';
 import { Roles } from '@thallesp/nestjs-better-auth';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe.js';
@@ -27,6 +29,13 @@ export class CategoriesController {
     @Body(new ZodValidationPipe(categoryInputSchema)) input: CategoryInput,
   ): Promise<Category> {
     return this.categories.create(input);
+  }
+
+  @Put('order')
+  async reorder(
+    @Body(new ZodValidationPipe(categoryReorderSchema)) input: CategoryReorder,
+  ): Promise<CategoryList> {
+    return { categories: await this.categories.reorder(input) };
   }
 
   @Patch(':id')

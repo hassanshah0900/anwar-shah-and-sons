@@ -1,5 +1,5 @@
-import { NotFoundException } from '@nestjs/common';
-import { ilike, max, type SQL } from 'drizzle-orm';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { and, eq, ilike, max, type SQL } from 'drizzle-orm';
 import { DrizzleQueryError } from 'drizzle-orm/errors';
 import pg from 'pg';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
@@ -45,6 +45,38 @@ export async function nextPosition(
     .from(table)
     .where(where);
   return ((row?.last as number | null | undefined) ?? -1) + 1;
+}
+
+/** A new order must hold exactly the items there are now; otherwise the page was stale. */
+export function assertSameItems(ids: string[], current: string[]): void {
+  const existing = new Set(current);
+  if (ids.length !== existing.size || ids.some((id) => !existing.has(id))) {
+    throw new BadRequestException('The list has changed. Reload the page and try again.');
+  }
+}
+
+/**
+ * Saves a list's new order: `ids` must be exactly the rows `scope` selects, and each
+ * gets its index as its position. Run it in a transaction so the order changes at once.
+ */
+export async function saveOrder(
+  db: Queryable,
+  table: PgTable & { id: PgColumn; position: PgColumn },
+  scope: SQL | undefined,
+  ids: string[],
+): Promise<void> {
+  const rows = await db.select({ id: table.id }).from(table).where(scope);
+  assertSameItems(
+    ids,
+    rows.map((row) => row.id as string),
+  );
+  for (const [position, id] of ids.entries()) {
+    await db
+      .update(table)
+      // Every table passed has a position column; TypeScript can't see that through the generic.
+      .set({ position } as never)
+      .where(and(eq(table.id, id), scope));
+  }
 }
 
 /** Whether a query failed on a unique index (e.g. two identical submissions at once). */
