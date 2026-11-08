@@ -2,14 +2,14 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { optionTypeListSchema, type OptionType } from '@repo/shared';
 import { ConfirmDeleteDialog } from '@/components/admin/confirm-delete-dialog';
-import { Swatch } from '@/components/shop/swatch';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiRequest } from '@/lib/api/server';
 import { Empty, EmptyDescription } from '@/components/ui/empty';
-import { deleteOptionType, deleteOptionValue } from './actions';
+import { deleteOptionType } from './actions';
 import { OptionTypeDialog } from './option-type-dialog';
-import { AddOptionValueForm, EditOptionValueDialog } from './option-value-form';
+import { AddOptionValueForm } from './option-value-form';
+import { OptionValueList } from './option-value-list';
 
 export const metadata: Metadata = { title: 'Options' };
 
@@ -20,7 +20,8 @@ export default function OptionsPage() {
         <div>
           <h1 className="text-4xl">Options</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            The ways products vary, such as Size or Colour. Each combination becomes a variant.
+            The ways products vary, such as Size or Colour. Each combination becomes a variant. Drag
+            values to change the order shoppers see them in.
           </p>
         </div>
         <OptionTypeDialog />
@@ -73,27 +74,7 @@ function OptionTypeSection({ optionType }: { optionType: OptionType }) {
         </div>
       </header>
 
-      {optionType.values.length > 0 && (
-        <ul className="divide-y">
-          {optionType.values.map((value) => (
-            <li key={value.id} className="flex items-center gap-3 px-4 py-2">
-              {value.colorHex && <Swatch color={value.colorHex} label={value.label} />}
-              <span className="text-sm">{value.label}</span>
-              <span className="font-mono text-xs text-muted-foreground">{value.slug}</span>
-              <div className="ml-auto flex gap-1">
-                <EditOptionValueDialog optionType={optionType} value={value} />
-                <ConfirmDeleteDialog
-                  title={`Delete ${value.label}?`}
-                  description={`Removes ${value.label} from ${optionType.name}.`}
-                  action={deleteOptionValue}
-                  fields={{ typeId: optionType.id, valueId: value.id }}
-                  label={`Delete ${value.label}`}
-                />
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+      {optionType.values.length > 0 && <OptionValueList optionType={optionType} />}
 
       <div className="border-t bg-muted/40 px-4 py-4">
         <AddOptionValueForm optionType={optionType} />

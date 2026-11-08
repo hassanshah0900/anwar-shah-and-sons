@@ -79,3 +79,18 @@ export const optionValueInputSchema = z.object({
   position: positionSchema.optional(),
 });
 export type OptionValueInput = z.infer<typeof optionValueInputSchema>;
+
+// ─── Ordering ───────────────────────────────────────────────────────────────
+
+/** A list's new order: every item's id, once, first to last. */
+export const reorderSchema = z.object({
+  ids: z
+    .array(idSchema)
+    .min(1, 'Send at least one id')
+    .refine((ids) => new Set(ids).size === ids.length, 'Send each id once'),
+});
+export type Reorder = z.infer<typeof reorderSchema>;
+
+/** Sub-categories are ordered among their siblings; a null parent means the top level. */
+export const categoryReorderSchema = reorderSchema.extend({ parentId: idSchema.nullable() });
+export type CategoryReorder = z.infer<typeof categoryReorderSchema>;

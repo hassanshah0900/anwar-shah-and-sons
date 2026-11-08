@@ -9,7 +9,7 @@ import {
 import { and, asc, eq } from 'drizzle-orm';
 import type { Database } from '../../db/connection.js';
 import { InjectDatabase } from '../../db/database.module.js';
-import { found, nextPosition, orNotFound, touch } from '../../db/queries.js';
+import { found, nextPosition, orNotFound, saveOrder, touch } from '../../db/queries.js';
 import { optionTypes, optionValues } from '../../db/schema/index.js';
 
 const valueColumns = {
@@ -121,6 +121,14 @@ export class OptionsService {
       .where(and(eq(optionValues.id, valueId), eq(optionValues.optionTypeId, typeId)))
       .returning(valueColumns);
     return found(rows);
+  }
+
+  async reorderValues(typeId: string, ids: string[]): Promise<OptionType> {
+    await this.kindOf(typeId);
+    await this.db.transaction((tx) =>
+      saveOrder(tx, optionValues, eq(optionValues.optionTypeId, typeId), ids),
+    );
+    return this.type(typeId);
   }
 
   async removeValue(typeId: string, valueId: string): Promise<void> {

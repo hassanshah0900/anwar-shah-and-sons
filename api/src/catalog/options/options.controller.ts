@@ -1,13 +1,15 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put } from '@nestjs/common';
 import {
   ADMIN_ROLE,
   optionTypeInputSchema,
   optionValueInputSchema,
+  reorderSchema,
   type OptionType,
   type OptionTypeInput,
   type OptionTypeList,
   type OptionValue,
   type OptionValueInput,
+  type Reorder,
 } from '@repo/shared';
 import { Roles } from '@thallesp/nestjs-better-auth';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe.js';
@@ -53,6 +55,14 @@ export class OptionsController {
     @Body(new ZodValidationPipe(optionValueInputSchema)) input: OptionValueInput,
   ): Promise<OptionValue> {
     return this.options.createValue(id, input);
+  }
+
+  @Put(':id/values/order')
+  reorderValues(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(reorderSchema)) { ids }: Reorder,
+  ): Promise<OptionType> {
+    return this.options.reorderValues(id, ids);
   }
 
   @Patch(':id/values/:valueId')

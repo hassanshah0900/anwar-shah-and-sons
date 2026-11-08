@@ -2,7 +2,6 @@
 
 import Image from 'next/image';
 import { useActionState, useState } from 'react';
-import { ArrowLeftIcon, ArrowRightIcon } from 'lucide-react';
 import {
   imageContentTypes,
   MAX_IMAGE_BYTES,
@@ -13,6 +12,7 @@ import {
   type ProductImage,
 } from '@repo/shared';
 import { ConfirmDeleteDialog } from '@/components/admin/confirm-delete-dialog';
+import { SortableList } from '@/components/admin/sortable-list';
 import { FormError } from '@/components/forms/form-error';
 import { FormField } from '@/components/forms/form-field';
 import { Badge } from '@/components/ui/badge';
@@ -28,7 +28,7 @@ import {
 import { formKey, initialActionState } from '@/lib/forms/action-state';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { deleteImage, moveImage, updateImage, uploadImage } from './image-actions';
+import { deleteImage, reorderImages, updateImage, uploadImage } from './image-actions';
 
 const ALL = 'all';
 
@@ -48,25 +48,29 @@ export function ProductImages({ product, optionTypes }: ProductImagesProps) {
           Images
         </h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          The first image is the main one. Link an image to a colour to show it when that colour is
-          chosen.
+          The first image is the main one; drag to reorder. Link an image to a colour to show it
+          when that colour is chosen.
         </p>
       </div>
 
       {images.length > 0 && (
-        <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {images.map((image, index) => (
+        <SortableList
+          items={images}
+          label={(image) => imageName(image, images.indexOf(image))}
+          onReorder={(ids) => reorderImages(product.id, ids)}
+          layout="grid"
+          className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4"
+        >
+          {(image, handle, index) => (
             <ImageCard
-              key={image.id}
               productId={product.id}
               image={image}
               index={index}
-              previous={images[index - 1]}
-              next={images[index + 1]}
               values={values}
+              handle={handle}
             />
-          ))}
-        </ul>
+          )}
+        </SortableList>
       )}
 
       {images.length < MAX_PRODUCT_IMAGES ? (
@@ -80,122 +84,74 @@ export function ProductImages({ product, optionTypes }: ProductImagesProps) {
   );
 }
 
+const imageName = (image: ProductImage, index: number) => image.alt || `Image ${index + 1}`;
+
 type ImageCardProps = {
   productId: string;
   image: ProductImage;
   index: number;
-  previous?: ProductImage;
-  next?: ProductImage;
   values: OptionValue[];
+  handle: React.ReactNode;
 };
 
-function ImageCard({ productId, image, index, previous, next, values }: ImageCardProps) {
+function ImageCard({ productId, image, index, values, handle }: ImageCardProps) {
   const [state, formAction, pending] = useActionState(updateImage, initialActionState);
-  const name = image.alt || `Image ${index + 1}`;
+  const name = imageName(image, index);
 
   return (
-    <li>
-      <Card className="grid h-full content-start gap-3 p-3 text-base">
-        <div className="relative aspect-3/4 overflow-hidden bg-muted">
-          <Image
-            src={`/media/${image.key}`}
-            alt={image.alt}
-            fill
-            sizes="(min-width: 1024px) 20vw, (min-width: 640px) 30vw, 45vw"
-            className="object-cover"
+    <Card className="grid h-full content-start gap-3 p-3 text-base">
+      <div className="relative aspect-3/4 overflow-hidden bg-muted">
+        <Image
+          src={`/media/${image.key}`}
+          alt={image.alt}
+          fill
+          sizes="(min-width: 1024px) 20vw, (min-width: 640px) 30vw, 45vw"
+          className="object-cover"
+        />
+        {index === 0 && <Badge className="absolute top-2 left-2">Main</Badge>}
+      </div>
+
+      <form key={formKey(state)} action={formAction} className="grid gap-2">
+        <input type="hidden" name="productId" value={productId} />
+        <input type="hidden" name="imageId" value={image.id} />
+        <FormField
+          id={`alt-${image.id}`}
+          name="alt"
+          label="Alt text"
+          placeholder="Describe the photo"
+          defaultValue={state.values?.alt ?? image.alt}
+          error={state.fieldErrors?.alt}
+        />
+        {values.length > 0 && (
+          <ShowsForSelect
+            id={`shows-${image.id}`}
+            values={values}
+            defaultValue={state.values?.optionValueId ?? image.optionValueId}
           />
-          {index === 0 && <Badge className="absolute top-2 left-2">Main</Badge>}
-        </div>
+        )}
+        {state.status === 'error' && state.message && (
+          <p role="alert" className="text-sm text-destructive">
+            {state.message}
+          </p>
+        )}
+        <Button type="submit" variant="outline" size="sm" disabled={pending}>
+          {pending ? 'Saving…' : state.status === 'success' ? 'Saved' : 'Save'}
+        </Button>
+      </form>
 
-        <form key={formKey(state)} action={formAction} className="grid gap-2">
-          <input type="hidden" name="productId" value={productId} />
-          <input type="hidden" name="imageId" value={image.id} />
-          <FormField
-            id={`alt-${image.id}`}
-            name="alt"
-            label="Alt text"
-            placeholder="Describe the photo"
-            defaultValue={state.values?.alt ?? image.alt}
-            error={state.fieldErrors?.alt}
+      <div className="flex items-center gap-1">
+        {handle}
+        <div className="ml-auto">
+          <ConfirmDeleteDialog
+            title="Delete this image?"
+            description="The file is removed from storage. This can't be undone."
+            action={deleteImage}
+            fields={{ productId, imageId: image.id }}
+            label={`Delete ${name}`}
           />
-          {values.length > 0 && (
-            <ShowsForSelect
-              id={`shows-${image.id}`}
-              values={values}
-              defaultValue={state.values?.optionValueId ?? image.optionValueId}
-            />
-          )}
-          {state.status === 'error' && state.message && (
-            <p role="alert" className="text-sm text-destructive">
-              {state.message}
-            </p>
-          )}
-          <Button type="submit" variant="outline" size="sm" disabled={pending}>
-            {pending ? 'Saving…' : state.status === 'success' ? 'Saved' : 'Save'}
-          </Button>
-        </form>
-
-        <div className="flex items-center gap-1">
-          <MoveButton
-            productId={productId}
-            image={image}
-            neighbour={previous}
-            label={`Move ${name} earlier`}
-          >
-            <ArrowLeftIcon />
-          </MoveButton>
-          <MoveButton
-            productId={productId}
-            image={image}
-            neighbour={next}
-            label={`Move ${name} later`}
-          >
-            <ArrowRightIcon />
-          </MoveButton>
-          <div className="ml-auto">
-            <ConfirmDeleteDialog
-              title="Delete this image?"
-              description="The file is removed from storage. This can't be undone."
-              action={deleteImage}
-              fields={{ productId, imageId: image.id }}
-              label={`Delete ${name}`}
-            />
-          </div>
         </div>
-      </Card>
-    </li>
-  );
-}
-
-type MoveButtonProps = {
-  productId: string;
-  image: ProductImage;
-  neighbour?: ProductImage;
-  label: string;
-  children: React.ReactNode;
-};
-
-function MoveButton({ productId, image, neighbour, label, children }: MoveButtonProps) {
-  const [, formAction, pending] = useActionState(moveImage, initialActionState);
-  if (!neighbour) {
-    return (
-      <Button variant="ghost" size="icon-sm" disabled aria-label={label}>
-        {children}
-      </Button>
-    );
-  }
-
-  return (
-    <form action={formAction}>
-      <input type="hidden" name="productId" value={productId} />
-      <input type="hidden" name="imageId" value={image.id} />
-      <input type="hidden" name="position" value={image.position} />
-      <input type="hidden" name="neighbourId" value={neighbour.id} />
-      <input type="hidden" name="neighbourPosition" value={neighbour.position} />
-      <Button type="submit" variant="ghost" size="icon-sm" disabled={pending} aria-label={label}>
-        {children}
-      </Button>
-    </form>
+      </div>
+    </Card>
   );
 }
 

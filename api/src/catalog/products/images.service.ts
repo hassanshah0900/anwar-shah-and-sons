@@ -10,11 +10,11 @@ import { invalidField } from '../../common/zod-validation.pipe.js';
 import { and, eq, exists } from 'drizzle-orm';
 import type { Database } from '../../db/connection.js';
 import { InjectDatabase } from '../../db/database.module.js';
-import { found, nextPosition, orNotFound } from '../../db/queries.js';
-import { optionValues, productImages, productOptions, products } from '../../db/schema/index.js';
+import { found, nextPosition, saveOrder } from '../../db/queries.js';
+import { optionValues, productImages, productOptions } from '../../db/schema/index.js';
 import { detectImageType } from '../../storage/image-type.js';
 import { extensionFor, StorageService } from '../../storage/storage.js';
-import { findProduct } from './product.mapper.js';
+import { assertProduct, findProduct } from './product.mapper.js';
 
 export type ImageUpload = { buffer: Buffer; alt?: string; optionValueId?: string | null };
 
@@ -28,12 +28,7 @@ export class ImagesService {
   ) {}
 
   async upload(productId: string, upload: ImageUpload): Promise<Product> {
-    orNotFound(
-      await this.db.query.products.findFirst({
-        where: eq(products.id, productId),
-        columns: { id: true },
-      }),
-    );
+    await assertProduct(this.db, productId);
     const imageCount = await this.db.$count(productImages, eq(productImages.productId, productId));
     if (imageCount >= MAX_PRODUCT_IMAGES) {
       throw new BadRequestException(`A product can have at most ${MAX_PRODUCT_IMAGES} images`);
@@ -94,6 +89,15 @@ export class ImagesService {
           .returning({ id: productImages.id }),
       );
     }
+    return findProduct(this.db, productId);
+  }
+
+  /** The first image is the product's main one. */
+  async reorder(productId: string, ids: string[]): Promise<Product> {
+    await assertProduct(this.db, productId);
+    await this.db.transaction((tx) =>
+      saveOrder(tx, productImages, eq(productImages.productId, productId), ids),
+    );
     return findProduct(this.db, productId);
   }
 

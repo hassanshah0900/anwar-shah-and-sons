@@ -1,14 +1,27 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
 import {
   ADMIN_ROLE,
   productInputSchema,
   productListQuerySchema,
   productUpdateSchema,
+  reorderSchema,
   type Product,
   type ProductInput,
   type ProductList,
   type ProductListQuery,
   type ProductUpdate,
+  type Reorder,
 } from '@repo/shared';
 import { Roles } from '@thallesp/nestjs-better-auth';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe.js';
@@ -42,6 +55,15 @@ export class ProductsController {
     @Body(new ZodValidationPipe(productUpdateSchema)) input: ProductUpdate,
   ): Promise<Product> {
     return this.products.update(id, input);
+  }
+
+  /** `ids` are option type ids, in the order shoppers should see them. */
+  @Put(':id/options/order')
+  reorderOptions(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(reorderSchema)) { ids }: Reorder,
+  ): Promise<Product> {
+    return this.products.reorderOptions(id, ids);
   }
 
   @Delete(':id')

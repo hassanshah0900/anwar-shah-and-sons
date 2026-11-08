@@ -8,6 +8,7 @@ import {
   optionValueSchema,
 } from '@repo/shared';
 import { apiCommand, apiRequest } from '@/lib/api/server';
+import { saveOrder } from '@/lib/api/reorder';
 import { requireAdmin } from '@/lib/auth/session';
 import { optionalText, type ActionState } from '@/lib/forms/action-state';
 import { apiErrorState, validationState } from '@/lib/forms/server';
@@ -108,4 +109,11 @@ export async function deleteOptionValue(
 
   refresh();
   return { status: 'success' };
+}
+
+export async function reorderOptionValues(typeId: string, ids: string[]) {
+  await requireAdmin('/admin/options');
+  return saveOrder(`/api/v1/admin/option-types/${encodeURIComponent(typeId)}/values/order`, {
+    ids,
+  });
 }
