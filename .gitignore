@@ -11,9 +11,6 @@ next-env.d.ts
 
 # Generated code
 
-# Turborepo
-.turbo/
-
 # Testing
 coverage/
 test-results/

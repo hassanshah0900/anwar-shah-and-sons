@@ -34,7 +34,7 @@ flowchart LR
 | Auth      | Better Auth (sessions, roles)        |
 | Testing   | Vitest, Supertest, Playwright        |
 | Linting   | ESLint (web), oxlint (api), Prettier |
-| Monorepo  | npm workspaces, Turborepo            |
+| Monorepo  | npm workspaces                       |
 
 ## Repository structure
 
@@ -45,7 +45,6 @@ shared/             API contracts (Zod schemas + types), used by web and api
 e2e/                Playwright browser tests (run web + api together)
 docs/adr/           architecture decision records
 tsconfig.base.json  TypeScript settings every project extends
-turbo.json          Turborepo tasks (build order + caching)
 ```
 
 Each top-level project folder is an [npm workspace](https://docs.npmjs.com/cli/using-npm/workspaces)

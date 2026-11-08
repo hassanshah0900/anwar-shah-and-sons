@@ -13,17 +13,17 @@
     "e2e"
   ],
   "scripts": {
-    "dev": "turbo run dev",
-    "build": "turbo run build",
-    "lint": "turbo run lint",
-    "typecheck": "turbo run typecheck",
-    "test": "turbo run test",
+    "dev": "npm run build:shared && (npm run dev -w shared & npm run dev -w api & npm run dev -w web & wait)",
+    "build:shared": "npm run build -w shared",
+    "build": "npm run build:shared && npm run build -w api && npm run build -w web",
+    "lint": "npm run build:shared && npm run lint --workspaces --if-present",
+    "typecheck": "npm run build:shared && npm run typecheck --workspaces --if-present",
+    "test": "npm run build:shared && npm run test --workspaces --if-present",
     "test:browser": "npm run test:e2e -w e2e",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "devDependencies": {
-    "prettier": "^3.4.2",
-    "turbo": "^2.11.10"
+    "prettier": "^3.4.2"
   }
 }

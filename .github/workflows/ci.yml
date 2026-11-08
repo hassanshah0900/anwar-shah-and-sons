@@ -64,7 +64,7 @@ jobs:
           cache: npm
       - run: npm ci
       # Also builds @repo/shared, which the tests import.
-      - run: npx turbo run build --filter=api
+      - run: npm run build -w shared && npm run build -w api
       - run: npm run test:e2e -w api
 
   browser:

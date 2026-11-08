@@ -1,6 +1,7 @@
 # 0001. Monorepo with npm workspaces and Turborepo
 
-- **Status**: Accepted; folder layout superseded by [0008](0008-flat-workspace-layout.md)
+- **Status**: Accepted; folder layout superseded by [0008](0008-flat-workspace-layout.md),
+  Turborepo by [0010](0010-npm-scripts-instead-of-turborepo.md)
 - **Date**: 2026-11-01
 
 ## Context

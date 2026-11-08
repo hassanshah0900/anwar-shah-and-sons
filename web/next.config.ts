@@ -1,6 +1,8 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  // Also write .next/standalone: a server with only the files it needs, for the Docker image.
+  output: 'standalone',
   cacheComponents: true,
   partialPrefetching: true,
   images: {

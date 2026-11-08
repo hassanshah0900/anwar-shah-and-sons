@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test:e2e": "turbo run build --filter=web --filter=api --ui=stream && node support/setup-database.ts && playwright test",
+    "test:e2e": "npm --prefix .. run build && node support/setup-database.ts && playwright test",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
