@@ -29,7 +29,7 @@ async function Categories() {
           <h1 className="text-4xl">Categories</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             How products are grouped in the store, e.g. Women › Kurtas. Drag to change the order
-            they're shown in.
+            they’re shown in.
           </p>
         </div>
         <CategoryFormDialog categories={categories} />
