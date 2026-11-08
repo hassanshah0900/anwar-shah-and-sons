@@ -6,6 +6,7 @@ import { apiCommand, apiRequest } from '@/lib/api/server';
 import { requireAdmin } from '@/lib/auth/session';
 import { optionalText, type ActionState } from '@/lib/forms/action-state';
 import { apiErrorState, validationState } from '@/lib/forms/server';
+import { saveOrder } from '@/lib/api/reorder';
 
 const NO_PARENT = 'none';
 
@@ -52,4 +53,10 @@ export async function deleteCategory(
 
   refresh();
   return { status: 'success' };
+}
+
+/** Orders the sub-categories of one parent, or the top level when it's null. */
+export async function reorderCategories(parentId: string | null, ids: string[]) {
+  await requireAdmin('/admin/categories');
+  return saveOrder('/api/v1/admin/categories/order', { parentId, ids });
 }

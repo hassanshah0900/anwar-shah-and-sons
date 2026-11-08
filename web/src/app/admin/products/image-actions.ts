@@ -3,6 +3,7 @@
 import { refresh } from 'next/cache';
 import { productImageUpdateSchema, productSchema } from '@repo/shared';
 import { apiRequest } from '@/lib/api/server';
+import { saveOrder } from '@/lib/api/reorder';
 import { requireAdmin } from '@/lib/auth/session';
 import { optionalText, type ActionState } from '@/lib/forms/action-state';
 import { apiErrorState, validationState } from '@/lib/forms/server';
@@ -61,24 +62,12 @@ export async function updateImage(_state: ActionState, formData: FormData): Prom
 }
 
 /** Swaps an image's position with its neighbour's. */
-export async function moveImage(_state: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAdmin('/admin/products');
-
-  try {
-    await apiRequest(imagePath(formData), productSchema, {
-      method: 'PATCH',
-      body: { position: Number(formData.get('neighbourPosition')) },
-    });
-    await apiRequest(imagePath(formData, 'neighbourId'), productSchema, {
-      method: 'PATCH',
-      body: { position: Number(formData.get('position')) },
-    });
-  } catch (error) {
-    return apiErrorState(error, formData);
-  }
-
-  refresh();
-  return { status: 'success' };
+/** The first image becomes the product's main one. */
+export async function reorderImages(productId: string, ids: string[]) {
+  await requireAdmin(`/admin/products/${productId}`);
+  return saveOrder(`/api/v1/admin/products/${encodeURIComponent(productId)}/images/order`, {
+    ids,
+  });
 }
 
 export async function deleteImage(_state: ActionState, formData: FormData): Promise<ActionState> {

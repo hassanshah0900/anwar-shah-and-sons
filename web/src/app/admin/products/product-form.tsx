@@ -26,6 +26,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { flattenCategoryTree } from '@/lib/catalog/category-tree';
 import { formList, formKey, initialActionState, type ActionState } from '@/lib/forms/action-state';
 import { priceInputValue } from '@/lib/money';
+import { OptionOrder } from './option-order';
 
 type ProductFormProps = {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
@@ -198,6 +199,7 @@ export function ProductForm({ action, categories, optionTypes, store, product }:
           ))
         )}
         {errors.optionTypeIds && <p className="text-sm text-destructive">{errors.optionTypeIds}</p>}
+        {product && product.options.length > 1 && <OptionOrder product={product} />}
       </fieldset>
 
       <div>

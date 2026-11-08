@@ -18,7 +18,7 @@ export class ApiError extends Error {
 }
 
 type ApiRequest = {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   /** JSON-serialisable data, or FormData for multipart uploads. */
   body?: unknown;
   /** Extra request headers, such as the guest cart token. */

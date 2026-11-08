@@ -2,12 +2,8 @@ import type { Category } from '@repo/shared';
 
 export type CategoryNode = { category: Category; depth: number };
 
-/**
- * Orders categories depth-first (parents before their children, siblings by
- * position then name) and records each one's depth, for indented lists and
- * parent pickers.
- */
-export function flattenCategoryTree(categories: Category[]): CategoryNode[] {
+/** Each parent's sub-categories (null for the top level), by position then name. */
+export function childrenByParent(categories: Category[]): Map<string | null, Category[]> {
   const byParent = new Map<string | null, Category[]>();
   for (const category of categories) {
     const siblings = byParent.get(category.parentId) ?? [];
@@ -17,7 +13,16 @@ export function flattenCategoryTree(categories: Category[]): CategoryNode[] {
   for (const siblings of byParent.values()) {
     siblings.sort((a, b) => a.position - b.position || a.name.localeCompare(b.name));
   }
+  return byParent;
+}
 
+/**
+ * Orders categories depth-first (parents before their children, siblings by
+ * position then name) and records each one's depth, for indented lists and
+ * parent pickers.
+ */
+export function flattenCategoryTree(categories: Category[]): CategoryNode[] {
+  const byParent = childrenByParent(categories);
   const result: CategoryNode[] = [];
   const visit = (parentId: string | null, depth: number) => {
     for (const category of byParent.get(parentId) ?? []) {

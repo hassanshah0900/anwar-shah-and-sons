@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { productInputSchema, productSchema, productUpdateSchema } from '@repo/shared';
 import { apiCommand, apiRequest } from '@/lib/api/server';
 import { getStoreConfig } from '@/lib/api/store';
+import { saveOrder } from '@/lib/api/reorder';
 import { requireAdmin } from '@/lib/auth/session';
 import { optionalText, type ActionState } from '@/lib/forms/action-state';
 import { apiErrorState, validationState } from '@/lib/forms/server';
@@ -79,4 +80,12 @@ export async function deleteProduct(_state: ActionState, formData: FormData): Pr
   }
 
   redirect('/admin/products');
+}
+
+/** The order shoppers see the product's options in, e.g. Colour before Size. */
+export async function reorderProductOptions(productId: string, optionTypeIds: string[]) {
+  await requireAdmin(`/admin/products/${productId}`);
+  return saveOrder(`${BASE}/${encodeURIComponent(productId)}/options/order`, {
+    ids: optionTypeIds,
+  });
 }
