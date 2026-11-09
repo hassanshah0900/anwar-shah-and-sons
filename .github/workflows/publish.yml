@@ -1,0 +1,46 @@
+name: Publish images
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: Publish ${{ matrix.app }} image
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      # github.sha is main's latest commit when this run starts, not the commit CI tested.
+      # If PR A is merged and PR B is merged while CI tests A, github.sha is B, which is untested.
+      # head_sha is always the tested commit (A). Manual runs have no CI run, so they use github.sha.
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    strategy:
+      matrix:
+        app: [api, web]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SHA }}
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.app }}/Dockerfile
+          build-args: SITE_URL=${{ vars.SITE_URL }}
+          tags: ghcr.io/${{ github.repository_owner }}/anwar-shah-${{ matrix.app }}:${{ env.SHA }}
+          push: true
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}
