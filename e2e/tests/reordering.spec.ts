@@ -64,6 +64,8 @@ async function drag(page: Page, scope: Locator, name: string, onto: string) {
 /** The order holds once the page is loaded again from the server. */
 async function expectSaved(page: Page, scope: () => Locator, names: string[]) {
   await expect.poll(() => order(scope(), names)).toEqual(names);
+  // The list shows the new order before saving it; reloading sooner would lose it.
+  await expect(scope().locator('[aria-busy="true"]')).toHaveCount(0);
   await page.reload();
   await expect.poll(() => order(scope(), names)).toEqual(names);
 }
