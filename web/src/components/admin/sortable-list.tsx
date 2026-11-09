@@ -58,7 +58,7 @@ export function SortableList<T extends { id: string }>({
   const id = useId();
   const [order, setOrder] = useState<string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
+  const [saving, startTransition] = useTransition();
   const moved = useRef(false);
   const sensors = useSensors(
     // A few pixels of movement before a drag starts, so clicks on the handle still work.
@@ -148,7 +148,7 @@ export function SortableList<T extends { id: string }>({
           items={shown.map((item) => item.id)}
           strategy={layout === 'list' ? verticalListSortingStrategy : rectSortingStrategy}
         >
-          <ul className={className}>
+          <ul className={className} aria-busy={saving}>
             {shown.map((item, index) => (
               <SortableItem
                 key={item.id}
